@@ -134,3 +134,150 @@ Design an interface and visual result that you are proud of!
 ##### 3. Anti-Aliasing: Xiaolin Wu's Algorithm
 *   **Background:** Bresenham's algorithm produces "aliased" (jagged) lines. Xiaolin Wu's line algorithm solves this by drawing pairs of pixels that straddle the mathematical line, distributing the color intensity based on the exact fractional distance to the line's true center. 
 *   **Task:** Implement Xiaolin Wu's line algorithm. Because our assignment ignores the alpha channel (as established in Part 1). Note what happens when you draw a line on top of another line and attempt to fix the issue. Finally, add a UI toggle to instantly switch between Bresenham and Xiaolin Wu modes to visually compare the results.
+
+
+
+---
+
+# My Report
+
+**Student:** Mohammad Abu Saleh  
+**ID:** 206380487
+
+---
+
+## Part 1: Manipulating the Framebuffer
+
+### Approach
+Instead of the default gradient, I implemented an animated light rays effect inspired by Manchester City's colors (navy, sky blue, white). The pattern uses two overlapping sine waves applied to a diagonal coordinate `(x + y * 0.6)`, creating diagonal rays that flow across the screen over time using a `time` variable that increments each frame.
+
+### Math
+The core idea is combining two sine waves at different frequencies to create a complex but smooth pattern:
+```cpp
+float diag = (x + y * 0.6f) / freq_slider + time;
+float ray1 = sinf(diag) * 0.5f + 0.5f;
+float ray2 = sinf(diag * 2.3f + 1.0f) * 0.3f + 0.3f;
+float t = fminf(1.0f, ray1 * 0.7f + ray2);
+```
+Colors are then interpolated: navy → sky blue → white based on `t`.
+
+### Result
+![Part 1 - Animated background](./assets/background.png)
+
+---
+
+## Part 2: Immediate Mode UI Declaration
+
+### Approach
+Added a "Welcome!" button inside the Widgets window. When clicked it:
+1. Prints `"Welcome to my assignment!!"` to the console
+2. Toggles a label on screen that says `"Welcome to my assignment!"`
+
+This demonstrates the Immediate Mode pattern — the button is declared every frame and its state is read immediately via the return value of `mu_button()`. The toggle state is stored in a `static bool show_welcome` variable outside the widget.
+
+### Result
+![Part 2 - Welcome button and label](./assets/background.png)
+
+---
+
+## Part 3: The Real-Time Graphics Loop and Input Handling
+
+### Approach
+Intercepted the character input callback `mfb_set_char_input_callback` to add keyboard controls that modify global state variables:
+
+| Key | Effect |
+|---|---|
+| `a` | Increase animation speed |
+| `d` | Decrease animation speed |
+| `r` | Toggle between City colors and red/black theme |
+| `space` | Freeze/unfreeze the animation |
+
+Keys that don't match are passed along to `ui_bridge_char_input` so normal UI widgets (like the textbox) still receive input correctly.
+
+### Result
+![Part 3 - Red theme toggled with r key](./assets/colorsChangeAndLines.png)
+
+---
+
+## Part 4: UI Architecture & The Renderer Bridge
+
+### Approach
+Added a wave offset in `draw_rect` inside `ui_renderer.cpp`. Each row of pixels is shifted horizontally by `sin(y * 0.1) * 6` pixels, making the UI panels appear wobbly:
+
+```cpp
+int wave_offset = (int)(sinf(y * 0.1f) * 6.0f);
+int wx = x + wave_offset;
+```
+
+### Why Clicking Breaks
+MicroUI calculates click detection using the original unshifted coordinates. The visual rendering is shifted by the wave offset but the hitbox stays in the original position. To successfully click a button you must click at its original unshifted position, not where it visually appears on screen.
+
+### Result
+![Part 4 - Wavy UI panels](./assets/background.png)
+
+---
+
+## Part 5: Binding UI to Application State
+
+### Approach
+Added two sliders bound directly to global variables that control the background rendering:
+
+- **Ray Speed** slider → bound to `time_speed`, controls how fast the animation moves
+- **Ray Width** slider → bound to `freq_slider`, controls how wide or tight the diagonal rays are
+
+Using MicroUI's pointer-based binding (`&time_speed`, `&freq_slider`) means every frame the background loop reads the updated values directly from memory — no extra code needed to sync them.
+
+### Result
+![Part 5 - Ray Speed and Width sliders](./assets/Lines.png)
+
+---
+
+## Part 6: Interactive Line Drawing App
+
+### Bresenham's Algorithm
+Implemented Bresenham's line algorithm based on the class slides, using the professor's variable naming (`p1, q1, p2, q2`). The algorithm handles all 8 octants by:
+
+- **Swapping** x and y roles when the slope is steep (`|dq| > |dp|`)
+- **Reflecting** to ensure we always iterate left to right
+- Using an integer error term `e` to avoid floating point math entirely
+
+```cpp
+void draw_line(int p1, int q1, int p2, int q2, uint32_t color) {
+    bool steep = abs(dq) > abs(dp);
+    if (steep) { swap x and y }
+    if (p1 > p2) { reflect }
+    int e = 2 * dq - dp;
+    while (x <= p2) {
+        draw pixel
+        if (e > 0) { y += sy; e -= 2*dp; }
+        x++; e += 2*dq;
+    }
+}
+```
+
+### AI-Assisted UX Planning
+I used Claude (Anthropic) to brainstorm the UX for line drawing. We discussed three approaches:
+
+| Approach | Pros | Cons |
+|---|---|---|
+| Click-Click | Simple, precise | No preview while drawing |
+| Click-Drag | Intuitive, live preview | Requires more state management |
+| Brush/Continuous | Feels like a real drawing tool | Hard to draw straight lines |
+
+**Chosen: Click-Drag.** The user clicks and holds to set the start point, drags to preview the line in real time, and releases to finalize it permanently. This gives the best balance of control and visual feedback.
+
+### State Management
+- `is_drawing` — true while mouse button is held
+- `draw_start_x/y` — saved on mouse press
+- `lines[]` array — stores up to 1000 permanent lines
+- Preview line drawn every frame while dragging, not saved until release
+
+### Creative Canvas Features
+- Click-drag line drawing with live preview
+- RGB color sliders to pick line color before drawing
+- Clear Screen button to reset the canvas
+- Lines are stored and redrawn every frame over the animated background
+
+### Result
+![Part 6 - Interactive line drawing](./assets/Lines.png)
+
