@@ -162,7 +162,7 @@ float t = fminf(1.0f, ray1 * 0.7f + ray2);
 Colors are then interpolated: navy → sky blue → white based on `t`.
 
 ### Result
-![Part 1 - Animated background](./nanorender/assets/background.png)
+![Part 1 - Animated background](../nanorender/assets/background.png)
 
 ---
 
@@ -176,7 +176,7 @@ Added a "Welcome!" button inside the Widgets window. When clicked it:
 This demonstrates the Immediate Mode pattern — the button is declared every frame and its state is read immediately via the return value of `mu_button()`. The toggle state is stored in a `static bool show_welcome` variable outside the widget.
 
 ### Result
-![Part 2 - Welcome button and label](./nanorender/assets/background.png)
+![Part 2 - Welcome button and label](../nanorender/assets/background.png)
 
 ---
 
@@ -195,7 +195,7 @@ Intercepted the character input callback `mfb_set_char_input_callback` to add ke
 Keys that don't match are passed along to `ui_bridge_char_input` so normal UI widgets (like the textbox) still receive input correctly.
 
 ### Result
-![Part 3 - Red theme toggled with r key](./nanorender/assets/colorsChangeAndLines.png)
+![Part 3 - Red theme toggled with r key](../nanorender/assets/colorsChangeAndLines.png)
 
 ---
 
@@ -213,7 +213,7 @@ int wx = x + wave_offset;
 MicroUI calculates click detection using the original unshifted coordinates. The visual rendering is shifted by the wave offset but the hitbox stays in the original position. To successfully click a button you must click at its original unshifted position, not where it visually appears on screen.
 
 ### Result
-![Part 4 - Wavy UI panels](./assets/background.png)
+![Part 4 - Wavy UI panels](../nanorender/assets/background.png)
 
 ---
 
@@ -228,7 +228,7 @@ Added two sliders bound directly to global variables that control the background
 Using MicroUI's pointer-based binding (`&time_speed`, `&freq_slider`) means every frame the background loop reads the updated values directly from memory — no extra code needed to sync them.
 
 ### Result
-![Part 5 - Ray Speed and Width sliders](./nanorender/assets/Lines.png)
+![Part 5 - Ray Speed and Width sliders](../nanorender/assets/Lines.png)
 
 ---
 
@@ -279,5 +279,5 @@ I used Claude (Anthropic) to brainstorm the UX for line drawing. We discussed th
 - Lines are stored and redrawn every frame over the animated background
 
 ### Result
-![Part 6 - Interactive line drawing](./nanorender/assets/Lines.png)
+![Part 6 - Interactive line drawing](../nanorender/assets/Lines.png)
 
