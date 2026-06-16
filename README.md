@@ -1,8 +1,8 @@
 # Computer Graphics 2026 - Course Portfolio
 
 **Student Information**
-* **Name:** [Your Name Here]
-* **Student ID:** [Your ID Here]
+* **Name:** [Mohammad Abu Saleh]
+* **Student ID:** [206380487]
 
 ## Academic Integrity & Workflow Agreement
 

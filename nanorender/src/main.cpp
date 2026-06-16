@@ -2,6 +2,7 @@
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <math.h>
 
 extern "C" {
 #include "microui.h"
@@ -31,6 +32,8 @@ int main() {
 
   UIRenderer renderer(WIDTH, HEIGHT);
 
+  float time = 0.0f;
+
   // Set up char input callback for textbox input
   mfb_set_char_input_callback(
       [](struct mfb_window *w, unsigned int c) {
@@ -48,11 +51,34 @@ int main() {
       // Simple gradient background
       int x = i % WIDTH;
       int y = i / WIDTH;
-      uint8_t r = (uint8_t)((float)x / WIDTH * 128) + 32;
-      uint8_t g = (uint8_t)((float)y / HEIGHT * 128) + 32;
-      uint8_t b = 64;
+      
+      // diagonal rays using x and y combined
+      float diag = (x + y * 0.6f) / 60.0f + time;
+      // two overlapping ray frequencies for complexity
+      float ray1 = sinf(diag) * 0.5f + 0.5f;
+      float ray2 = sinf(diag * 2.3f + 1.0f) * 0.3f + 0.3f;
+      float t = fminf(1.0f, ray1 * 0.7f + ray2);
+
+      // city colors: navy -> sky blue -> white
+      uint8_t r, g, b;
+      if (t < 0.5f) {
+        // navy to sky blue
+        float s = t / 0.5f;
+        r = (uint8_t)(28  + (108 - 28)  * s);
+        g = (uint8_t)(44  + (171 - 44)  * s);
+        b = (uint8_t)(91  + (221 - 91)  * s);
+      } 
+      else {
+        // sky blue to white
+        float s = (t - 0.5f) / 0.5f;
+        r = (uint8_t)(108 + (255 - 108) * s);
+        g = (uint8_t)(171 + (255 - 171) * s);
+        b = (uint8_t)(221 + (255 - 221) * s);
+      }
       g_buffer[i] = MFB_RGB(r, g, b);
     }
+
+    time += 0.05f;
 
     // 3. UI Logic
     static float slider_val = 50.0f;
