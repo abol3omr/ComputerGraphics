@@ -4,7 +4,8 @@
 #include <stdlib.h>
 #include <math.h>
 
-extern "C" {
+extern "C"
+{
 #include "microui.h"
 }
 #include "ui_bridge.h"
@@ -14,8 +15,12 @@ extern "C" {
 #define HEIGHT 1200
 
 static uint32_t g_buffer[WIDTH * HEIGHT];
+float time_speed = 0.05f; // controls animation speed
+bool frozen = false;      // freeze toggle
+bool red_theme = false;   // color theme toggle
 
-int main() {
+int main()
+{
   struct mfb_window *window =
       mfb_open_ex("MiniGUI Platform", WIDTH, HEIGHT, MFB_WF_RESIZABLE);
   if (!window)
@@ -25,33 +30,52 @@ int main() {
   mu_init(ctx);
 
   // Set font callbacks for microui
-  ctx->text_width = [](mu_Font font, const char *str, int len) {
+  ctx->text_width = [](mu_Font font, const char *str, int len)
+  {
     return (len < 0 ? (int)strlen(str) : len) * 8;
   };
-  ctx->text_height = [](mu_Font font) { return 8; };
+  ctx->text_height = [](mu_Font font)
+  { return 8; };
 
   UIRenderer renderer(WIDTH, HEIGHT);
 
+  // added for part1
   float time = 0.0f;
+  // added for part3
 
   // Set up char input callback for textbox input
   mfb_set_char_input_callback(
-      [](struct mfb_window *w, unsigned int c) {
+      [](struct mfb_window *w, unsigned int c)
+      {
         extern void ui_bridge_char_input(struct mfb_window *, unsigned int);
-        ui_bridge_char_input(w, c);
+        extern float time_speed;
+        extern bool frozen;
+        extern bool red_theme;
+        if (c == 'a')
+          time_speed = fminf(time_speed + 0.02f, 0.3f); // increase speed
+        else if (c == 'd')
+          time_speed = fmaxf(time_speed - 0.02f, 0.01f); // decrease speed
+        else if (c == 'r')
+          red_theme = !red_theme; // toggle color theme
+        else if (c == ' ')
+          frozen = !frozen; // freeze/unfreeze
+        else
+          ui_bridge_char_input(w, c); // pass other keys to UI
       },
       window);
 
-  while (mfb_update_events(window) != MFB_STATE_EXIT) {
+  while (mfb_update_events(window) != MFB_STATE_EXIT)
+  {
     // 1. Input
     ui_bridge_input(ctx, window);
 
     // 2. Scene Rendering (Background)
-    for (int i = 0; i < WIDTH * HEIGHT; i++) {
+    for (int i = 0; i < WIDTH * HEIGHT; i++)
+    {
       // Simple gradient background
       int x = i % WIDTH;
       int y = i / WIDTH;
-      
+
       // diagonal rays using x and y combined
       float diag = (x + y * 0.6f) / 60.0f + time;
       // two overlapping ray frequencies for complexity
@@ -59,26 +83,48 @@ int main() {
       float ray2 = sinf(diag * 2.3f + 1.0f) * 0.3f + 0.3f;
       float t = fminf(1.0f, ray1 * 0.7f + ray2);
 
-      // city colors: navy -> sky blue -> white
+      // initial colors: navy, sky blue, white
       uint8_t r, g, b;
-      if (t < 0.5f) {
-        // navy to sky blue
-        float s = t / 0.5f;
-        r = (uint8_t)(28  + (108 - 28)  * s);
-        g = (uint8_t)(44  + (171 - 44)  * s);
-        b = (uint8_t)(91  + (221 - 91)  * s);
-      } 
-      else {
-        // sky blue to white
-        float s = (t - 0.5f) / 0.5f;
-        r = (uint8_t)(108 + (255 - 108) * s);
-        g = (uint8_t)(171 + (255 - 171) * s);
-        b = (uint8_t)(221 + (255 - 221) * s);
+      if (!red_theme)
+      {
+        // initial colors: navy, sky blue, white
+        if (t < 0.5f)
+        {
+          float s = t / 0.5f;
+          r = (uint8_t)(28 + (108 - 28) * s);
+          g = (uint8_t)(44 + (171 - 44) * s);
+          b = (uint8_t)(91 + (221 - 91) * s);
+        }
+        else
+        {
+          float s = (t - 0.5f) / 0.5f;
+          r = (uint8_t)(108 + (255 - 108) * s);
+          g = (uint8_t)(171 + (255 - 171) * s);
+          b = (uint8_t)(221 + (255 - 221) * s);
+        }
+      }
+      else
+      {
+        // red theme: black, red, crimson
+        if (t < 0.5f)
+        {
+          float s = t / 0.5f;
+          r = (uint8_t)(0 + (200 - 0) * s);
+          g = (uint8_t)(0 + (30 - 0) * s);
+          b = (uint8_t)(0 + (30 - 0) * s);
+        }
+        else
+        {
+          float s = (t - 0.5f) / 0.5f;
+          r = (uint8_t)(200 + (255 - 200) * s);
+          g = (uint8_t)(30 + (80 - 30) * s);
+          b = (uint8_t)(30 + (80 - 30) * s);
+        }
       }
       g_buffer[i] = MFB_RGB(r, g, b);
     }
 
-    time += 0.05f;
+    if (!frozen) time += time_speed;
 
     // 3. UI Logic
     static float slider_val = 50.0f;
@@ -91,7 +137,8 @@ int main() {
     mu_begin(ctx);
 
     // --- Widgets window ---
-    if (mu_begin_window(ctx, "Widgets", mu_rect(20, 20, 360, 540))) {
+    if (mu_begin_window(ctx, "Widgets", mu_rect(20, 20, 360, 540)))
+    {
       int w1[] = {-1};
 
       // label / text
@@ -104,11 +151,13 @@ int main() {
       // toggle welcome message on screen
       static bool show_welcome = false;
       mu_layout_row(ctx, 1, w1, 0);
-      if (mu_button(ctx, "Welcome!")) {
+      if (mu_button(ctx, "Welcome!"))
+      {
         printf("Welcome to my assignment!!\n");
         show_welcome = !show_welcome;
       }
-      if (show_welcome) {
+      if (show_welcome)
+      {
         mu_label(ctx, "Welcome to my assignment!");
       }
 
@@ -133,16 +182,19 @@ int main() {
       mu_number(ctx, &number_val, 0.1f);
 
       // header (collapsible section)
-      if (mu_header(ctx, "mu_header: collapsible section")) {
+      if (mu_header(ctx, "mu_header: collapsible section"))
+      {
         mu_layout_row(ctx, 1, w1, 0);
         mu_label(ctx, "Content inside the header.");
       }
 
       // treenode
-      if (mu_begin_treenode(ctx, "mu_treenode: root")) {
+      if (mu_begin_treenode(ctx, "mu_treenode: root"))
+      {
         mu_layout_row(ctx, 1, w1, 0);
         mu_label(ctx, "child item A");
-        if (mu_begin_treenode(ctx, "nested node")) {
+        if (mu_begin_treenode(ctx, "nested node"))
+        {
           mu_layout_row(ctx, 1, w1, 0);
           mu_label(ctx, "deeply nested item");
           mu_end_treenode(ctx);
@@ -152,7 +204,8 @@ int main() {
 
       // quit button
       mu_layout_row(ctx, 1, w1, 0);
-      if (mu_button(ctx, "Quit")) {
+      if (mu_button(ctx, "Quit"))
+      {
         quit_requested = true;
       }
 
@@ -160,12 +213,14 @@ int main() {
     }
 
     // --- Panel window ---
-    if (mu_begin_window(ctx, "Panel Demo", mu_rect(395, 20, 380, 200))) {
+    if (mu_begin_window(ctx, "Panel Demo", mu_rect(395, 20, 380, 200)))
+    {
       int w2[] = {-1};
       mu_layout_row(ctx, 1, w2, 120);
       mu_begin_panel(ctx, "scrollable panel");
       int wp[] = {-1};
-      for (int i = 1; i <= 12; i++) {
+      for (int i = 1; i <= 12; i++)
+      {
         mu_layout_row(ctx, 1, wp, 0);
         char line[32];
         snprintf(line, sizeof(line), "Panel row %d", i);
@@ -176,10 +231,12 @@ int main() {
     }
 
     // --- Popup demo window ---
-    if (mu_begin_window(ctx, "Popup Demo", mu_rect(395, 235, 380, 80))) {
+    if (mu_begin_window(ctx, "Popup Demo", mu_rect(395, 235, 380, 80)))
+    {
       int w3[] = {-1};
       mu_layout_row(ctx, 1, w3, 0);
-      if (mu_button(ctx, "Open popup")) {
+      if (mu_button(ctx, "Open popup"))
+      {
         mu_Container *popup = mu_get_container(ctx, "my popup");
         popup->rect = mu_rect(ctx->mouse_pos.x, ctx->mouse_pos.y, 260, 84);
         popup->open = 1;
@@ -189,11 +246,13 @@ int main() {
       int popup_opt = MU_OPT_POPUP | MU_OPT_NORESIZE | MU_OPT_NOSCROLL |
                       MU_OPT_NOTITLE | MU_OPT_CLOSED;
       if (mu_begin_window_ex(ctx, "my popup", mu_rect(0, 0, 260, 84),
-                             popup_opt)) {
+                             popup_opt))
+      {
         int wp[] = {-1};
         mu_layout_row(ctx, 1, wp, 0);
         mu_label(ctx, "mu_popup: click outside to close");
-        if (mu_button(ctx, "Close")) {
+        if (mu_button(ctx, "Close"))
+        {
           mu_get_current_container(ctx)->open = 0;
         }
         mu_end_window(ctx);
@@ -203,7 +262,8 @@ int main() {
 
     mu_end(ctx);
 
-    if (quit_requested) {
+    if (quit_requested)
+    {
       mfb_close(window);
       break;
     }
