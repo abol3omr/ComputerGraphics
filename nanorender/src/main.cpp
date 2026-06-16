@@ -18,6 +18,7 @@ static uint32_t g_buffer[WIDTH * HEIGHT];
 float time_speed = 0.05f; // controls animation speed
 bool frozen = false;      // freeze toggle
 bool red_theme = false;   // color theme toggle
+float freq_slider = 60.0f;  // controls ray width
 
 int main()
 {
@@ -77,7 +78,7 @@ int main()
       int y = i / WIDTH;
 
       // diagonal rays using x and y combined
-      float diag = (x + y * 0.6f) / 60.0f + time;
+      float diag = (x + y * 0.6f) / freq_slider + time;
       // two overlapping ray frequencies for complexity
       float ray1 = sinf(diag) * 0.5f + 0.5f;
       float ray2 = sinf(diag * 2.3f + 1.0f) * 0.3f + 0.3f;
@@ -160,6 +161,16 @@ int main()
       {
         mu_label(ctx, "Welcome to my assignment!");
       }
+
+      // speed slider
+      mu_layout_row(ctx, 1, w1, 0);
+      mu_label(ctx, "Ray Speed:");
+      mu_slider(ctx, &time_speed, 0.01f, 0.3f);
+
+      // frequency slider
+      mu_layout_row(ctx, 1, w1, 0);
+      mu_label(ctx, "Ray Width:");
+      mu_slider(ctx, &freq_slider, 20.0f, 120.0f);
 
       // checkbox
       mu_layout_row(ctx, 1, w1, 0);
