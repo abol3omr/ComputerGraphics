@@ -15,11 +15,81 @@ extern "C"
 #define HEIGHT 1200
 
 static uint32_t g_buffer[WIDTH * HEIGHT];
-float time_speed = 0.05f; // controls animation speed
-bool frozen = false;      // freeze toggle
-bool red_theme = false;   // color theme toggle
-float freq_slider = 60.0f;  // controls ray width
+float time_speed = 0.05f;  // controls animation speed
+bool frozen = false;       // freeze toggle
+bool red_theme = false;    // color theme toggle
+float freq_slider = 60.0f; // controls ray width
+// line storage
+struct Line
+{
+  int x0, y0, x1, y1;
+  uint32_t color;
+};
+static Line lines[1000];   // permanent lines array
+static int line_count = 0; // how many lines are stored
 
+// drawing state
+static bool is_drawing = false;
+static int draw_start_x = 0;
+static int draw_start_y = 0;
+
+// current line color (rgb sliders)
+float color_r = 255.0f;
+float color_g = 255.0f;
+float color_b = 255.0f;
+
+// bresenham's line algorithm
+// handles all slopes using switch and reflect approach
+void draw_line(int p1, int q1, int p2, int q2, uint32_t color)
+{
+  int dp = p2 - p1;
+  int dq = q2 - q1;
+
+  // determine switch (steep) and reflect (negative direction)
+  bool steep = abs(dq) > abs(dp);
+  if (steep)
+  {
+    std::swap(p1, q1);
+    std::swap(p2, q2);
+    std::swap(dp, dq);
+  }
+
+  // reflect: ensure we always go left to right
+  if (p1 > p2)
+  {
+    std::swap(p1, p2);
+    std::swap(q1, q2);
+  }
+  dp = p2 - p1;
+  dq = q2 - q1;
+
+  int sy = dq > 0 ? 1 : -1; // direction of y step
+  dq = abs(dq);
+
+  // e starts at -1 (as per slides), scaled by 2*dp to avoid floats
+  int e = 2 * dq - dp;
+
+  int x = p1, y = q1;
+  while (x <= p2)
+  {
+    // draw pixel, swap back if steep
+    int px = steep ? y : x;
+    int py = steep ? x : y;
+    if (px >= 0 && px < WIDTH && py >= 0 && py < HEIGHT)
+      g_buffer[py * WIDTH + px] = color;
+
+    // if e > 0, step y and adjust e
+    if (e > 0)
+    {
+      y += sy;
+      e -= 2 * dp;
+    }
+
+    // always step x and update e
+    x++;
+    e += 2 * dq;
+  }
+}
 int main()
 {
   struct mfb_window *window =
@@ -125,7 +195,49 @@ int main()
       g_buffer[i] = MFB_RGB(r, g, b);
     }
 
-    if (!frozen) time += time_speed;
+    if (!frozen)
+      time += time_speed;
+
+    // part 6
+
+    // draw all permanent lines
+    for (int i = 0; i < line_count; i++)
+    {
+      draw_line(lines[i].x0, lines[i].y0, lines[i].x1, lines[i].y1, lines[i].color);
+    }
+
+    // get current mouse position and button state from microui
+    int mx = ctx->mouse_pos.x;
+    int my = ctx->mouse_pos.y;
+    bool mouse_down = ctx->mouse_down & MU_MOUSE_LEFT;
+
+    // handle drawing state
+    bool over_ui = (ctx->hover_root != nullptr);
+
+    if (mouse_down && !is_drawing && !over_ui)
+    {
+      // start drawing only if not over UI
+      is_drawing = true;
+      draw_start_x = mx;
+      draw_start_y = my;
+    }
+    else if (!mouse_down && is_drawing)
+    {
+      // always save line on release, wherever mouse is
+      if (line_count < 1000)
+      {
+        lines[line_count++] = {
+            draw_start_x, draw_start_y, mx, my,
+            MFB_RGB((uint8_t)color_r, (uint8_t)color_g, (uint8_t)color_b)};
+      }
+      is_drawing = false;
+    }
+
+    if (is_drawing)
+    {
+      draw_line(draw_start_x, draw_start_y, mx, my,
+                MFB_RGB((uint8_t)color_r, (uint8_t)color_g, (uint8_t)color_b));
+    }
 
     // 3. UI Logic
     static float slider_val = 50.0f;
@@ -268,6 +380,35 @@ int main()
         }
         mu_end_window(ctx);
       }
+      mu_end_window(ctx);
+    }
+    // --- Drawing Tools window ---
+    if (mu_begin_window(ctx, "Drawing Tools", mu_rect(395, 330, 380, 200)))
+    {
+      int wd[] = {-1};
+
+      // r slider
+      mu_layout_row(ctx, 1, wd, 0);
+      mu_label(ctx, "Red:");
+      mu_slider(ctx, &color_r, 0.0f, 255.0f);
+
+      // g slider
+      mu_layout_row(ctx, 1, wd, 0);
+      mu_label(ctx, "Green:");
+      mu_slider(ctx, &color_g, 0.0f, 255.0f);
+
+      // b slider
+      mu_layout_row(ctx, 1, wd, 0);
+      mu_label(ctx, "Blue:");
+      mu_slider(ctx, &color_b, 0.0f, 255.0f);
+
+      // clear button
+      mu_layout_row(ctx, 1, wd, 0);
+      if (mu_button(ctx, "Clear Screen"))
+      {
+        line_count = 0;
+      }
+
       mu_end_window(ctx);
     }
 
