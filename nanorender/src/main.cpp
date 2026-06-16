@@ -101,9 +101,15 @@ int main() {
                    "the window width automatically.");
 
       // button
+      // toggle welcome message on screen
+      static bool show_welcome = false;
       mu_layout_row(ctx, 1, w1, 0);
-      if (mu_button(ctx, "mu_button: click me")) {
-        quit_requested = false; // just a reaction
+      if (mu_button(ctx, "Welcome!")) {
+        printf("Welcome to my assignment!!\n");
+        show_welcome = !show_welcome;
+      }
+      if (show_welcome) {
+        mu_label(ctx, "Welcome to my assignment!");
       }
 
       // checkbox
