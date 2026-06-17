@@ -356,6 +356,20 @@ int main()
                 MFB_RGB((uint8_t)color_r, (uint8_t)color_g, (uint8_t)color_b));
     }
 
+    // part 3: draw wireframe using orthographic projection (drop z)
+    for (const auto &face : mesh_faces)
+    {
+      // get 3 vertices of this triangle
+      Vec3 v0 = norm_verts[face.v0];
+      Vec3 v1 = norm_verts[face.v1];
+      Vec3 v2 = norm_verts[face.v2];
+
+      // orthographic projection: just drop z, use x and y
+      draw_line((int)v0.x, (int)v0.y, (int)v1.x, (int)v1.y, MFB_RGB(255, 255, 255));
+      draw_line((int)v1.x, (int)v1.y, (int)v2.x, (int)v2.y, MFB_RGB(255, 255, 255));
+      draw_line((int)v2.x, (int)v2.y, (int)v0.x, (int)v0.y, MFB_RGB(255, 255, 255));
+    }
+
     // 3. UI Logic
     static float slider_val = 50.0f;
     static float number_val = 3.14f;
