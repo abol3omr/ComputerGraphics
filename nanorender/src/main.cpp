@@ -3,6 +3,10 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <math.h>
+#include <vector>
+#include <fstream>
+#include <sstream>
+#include <string>
 
 // assignment2
 #include <glm/glm.hpp>
@@ -94,6 +98,57 @@ void draw_line(int p1, int q1, int p2, int q2, uint32_t color)
     e += 2 * dq;
   }
 }
+
+// 3d vertex
+struct Vec3
+{
+  float x, y, z;
+};
+
+// triangle face - stores 3 vertex indices
+struct Face
+{
+  int v0, v1, v2;
+};
+
+// obj loader - reads vertices and faces from file
+bool load_obj(const char *path, std::vector<Vec3> &verts, std::vector<Face> &faces)
+{
+  std::ifstream file(path);
+  if (!file.is_open())
+  {
+    printf("failed to open: %s\n", path);
+    return false;
+  }
+  std::string line;
+  while (std::getline(file, line))
+  {
+    std::istringstream ss(line);
+    std::string token;
+    ss >> token;
+    if (token == "v")
+    {
+      // vertex line
+      Vec3 v;
+      ss >> v.x >> v.y >> v.z;
+      verts.push_back(v);
+    }
+    else if (token == "f")
+    {
+      // face line - parse only first number before '/'
+      Face f;
+      std::string s0, s1, s2;
+      ss >> s0 >> s1 >> s2;
+      f.v0 = std::stoi(s0) - 1; // obj indices start at 1
+      f.v1 = std::stoi(s1) - 1;
+      f.v2 = std::stoi(s2) - 1;
+      faces.push_back(f);
+    }
+  }
+  printf("loaded %zu vertices and %zu faces\n", verts.size(), faces.size());
+  return true;
+}
+
 int main()
 {
   struct mfb_window *window =
@@ -144,6 +199,11 @@ int main()
   model = glm::translate(model, position);
   printf("GLM works! Translated position: (%.1f, %.1f, %.1f)\n",
          model[3][0], model[3][1], model[3][2]);
+
+  // part 1: load obj file
+  std::vector<Vec3> mesh_verts;
+  std::vector<Face> mesh_faces;
+  load_obj("cube.obj", mesh_verts, mesh_faces);
 
   while (mfb_update_events(window) != MFB_STATE_EXIT)
   {
@@ -313,6 +373,15 @@ int main()
       mu_layout_row(ctx, 1, w1, 0);
       mu_label(ctx, "mu_number (step 0.1):");
       mu_number(ctx, &number_val, 0.1f);
+
+      // part 1: show mesh info
+      mu_layout_row(ctx, 1, w1, 0);
+      char mesh_info[64];
+      snprintf(mesh_info, sizeof(mesh_info), "Vertices: %d", (int)mesh_verts.size());
+      mu_label(ctx, mesh_info);
+
+      snprintf(mesh_info, sizeof(mesh_info), "Faces: %d", (int)mesh_faces.size());
+      mu_label(ctx, mesh_info);
 
       // header (collapsible section)
       if (mu_header(ctx, "mu_header: collapsible section"))
