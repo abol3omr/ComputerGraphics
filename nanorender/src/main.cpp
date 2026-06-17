@@ -149,6 +149,50 @@ bool load_obj(const char *path, std::vector<Vec3> &verts, std::vector<Face> &fac
   return true;
 }
 
+// normalize mesh to fit within window
+// returns normalized copy of vertices
+std::vector<Vec3> normalize_mesh(const std::vector<Vec3> &verts, int width, int height)
+{
+  // find bounding box
+  float min_x = verts[0].x, max_x = verts[0].x;
+  float min_y = verts[0].y, max_y = verts[0].y;
+  float min_z = verts[0].z, max_z = verts[0].z;
+  for (const auto &v : verts)
+  {
+    min_x = fminf(min_x, v.x);
+    max_x = fmaxf(max_x, v.x);
+    min_y = fminf(min_y, v.y);
+    max_y = fmaxf(max_y, v.y);
+    min_z = fminf(min_z, v.z);
+    max_z = fmaxf(max_z, v.z);
+  }
+
+  // center of bounding box
+  float cx = (min_x + max_x) / 2.0f;
+  float cy = (min_y + max_y) / 2.0f;
+  float cz = (min_z + max_z) / 2.0f;
+
+  // largest dimension -> scale factor
+  float range_x = max_x - min_x;
+  float range_y = max_y - min_y;
+  float range_z = max_z - min_z;
+  float max_range = fmaxf(range_x, fmaxf(range_y, range_z));
+
+  // scale to 80% of window size, centered
+  float scale = (fminf(width, height) * 0.8f) / max_range;
+
+  std::vector<Vec3> normalized;
+  for (const auto &v : verts)
+  {
+    Vec3 n;
+    n.x = (v.x - cx) * scale + width / 2.0f;
+    n.y = (v.y - cy) * scale + height / 2.0f;
+    n.z = (v.z - cz) * scale;
+    normalized.push_back(n);
+  }
+  return normalized;
+}
+
 int main()
 {
   struct mfb_window *window =
@@ -204,6 +248,9 @@ int main()
   std::vector<Vec3> mesh_verts;
   std::vector<Face> mesh_faces;
   load_obj("cube.obj", mesh_verts, mesh_faces);
+
+  // part 2: normalize mesh to fit window
+  std::vector<Vec3> norm_verts = normalize_mesh(mesh_verts, WIDTH, HEIGHT);
 
   while (mfb_update_events(window) != MFB_STATE_EXIT)
   {
