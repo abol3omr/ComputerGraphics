@@ -4,6 +4,10 @@
 #include <stdlib.h>
 #include <math.h>
 
+// assignment2
+#include <glm/glm.hpp>
+#include <glm/gtc/matrix_transform.hpp>
+
 extern "C"
 {
 #include "microui.h"
@@ -134,6 +138,12 @@ int main()
           ui_bridge_char_input(w, c); // pass other keys to UI
       },
       window);
+  // part 0: glm example - create a simple transformation matrix
+  glm::vec3 position(1.0f, 2.0f, 3.0f);
+  glm::mat4 model = glm::mat4(1.0f); // identity matrix
+  model = glm::translate(model, position);
+  printf("GLM works! Translated position: (%.1f, %.1f, %.1f)\n",
+         model[3][0], model[3][1], model[3][2]);
 
   while (mfb_update_events(window) != MFB_STATE_EXIT)
   {

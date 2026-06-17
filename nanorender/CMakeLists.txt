@@ -18,6 +18,16 @@ FetchContent_Declare(
 )
 FetchContent_MakeAvailable(minifb)
 
+#added for part 0 of assignment 2
+# --- GLM ---
+FetchContent_Declare(
+    glm
+    GIT_REPOSITORY https://github.com/g-truc/glm.git
+    GIT_TAG        1.0.1
+    GIT_SHALLOW    TRUE
+)
+FetchContent_MakeAvailable(glm)
+
 # --- microui (header + single C file, no CMakeLists) ---
 FetchContent_Declare(
     microui
@@ -38,6 +48,6 @@ add_executable(minigui
     src/ui_bridge.h
 )
 
-target_link_libraries(minigui PRIVATE microui_lib minifb)
+target_link_libraries(minigui PRIVATE microui_lib minifb glm::glm)
 target_include_directories(minigui PRIVATE src ${microui_SOURCE_DIR}/src ${minifb_SOURCE_DIR}/include)
 target_include_directories(minigui PRIVATE src src/deps/minifb/include)
