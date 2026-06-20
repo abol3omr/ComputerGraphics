@@ -67,6 +67,7 @@ To keep the repository clean and the reports professional, follow these standard
 | Assignment | Link |
 | :--- | :--- |
 | **Project 1: Basic Graphics and Immediate Mode GUI** | [View Report](./assignments/hw1.md) |
+| **HW2: Wireframe Viewer and Geometric Transformations** | [View Report](./assignments/hw2.md) |
 
 ---
 *Note: Please ensure all internal links remain functional as you add new folders.*
