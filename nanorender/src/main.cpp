@@ -19,8 +19,8 @@ extern "C"
 #include "ui_bridge.h"
 #include "ui_renderer.h"
 
-#define WIDTH 1600
-#define HEIGHT 1200
+#define WIDTH 1280
+#define HEIGHT 800
 
 // assignment2, part 4: local and world transformation state
 glm::vec3 local_translation(0.0f, 0.0f, 0.0f);
@@ -202,6 +202,32 @@ std::vector<Vec3> normalize_mesh(const std::vector<Vec3> &verts, int width, int 
   return normalized;
 }
 
+// part 5: apply local then world transforms to a vertex
+Vec3 apply_transforms(const Vec3 &v)
+{
+  glm::vec4 p(v.x, v.y, v.z, 1.0f);
+
+  // --- local transform: scale -> rotate -> translate (around object center) ---
+  glm::mat4 local = glm::mat4(1.0f);
+  local = glm::translate(local, local_translation);
+  local = glm::rotate(local, glm::radians(local_rotation.x), glm::vec3(1, 0, 0));
+  local = glm::rotate(local, glm::radians(local_rotation.y), glm::vec3(0, 1, 0));
+  local = glm::rotate(local, glm::radians(local_rotation.z), glm::vec3(0, 0, 1));
+  local = glm::scale(local, local_scale);
+
+  // --- world transform: scale -> rotate -> translate (around world origin) ---
+  glm::mat4 world = glm::mat4(1.0f);
+  world = glm::translate(world, world_translation);
+  world = glm::rotate(world, glm::radians(world_rotation.x), glm::vec3(1, 0, 0));
+  world = glm::rotate(world, glm::radians(world_rotation.y), glm::vec3(0, 1, 0));
+  world = glm::rotate(world, glm::radians(world_rotation.z), glm::vec3(0, 0, 1));
+  world = glm::scale(world, world_scale);
+
+  // apply local first, then world
+  glm::vec4 result = world * local * p;
+  return Vec3{result.x, result.y, result.z};
+}
+
 int main()
 {
   struct mfb_window *window =
@@ -366,14 +392,13 @@ int main()
     }
 
     // part 3: draw wireframe using orthographic projection (drop z)
+    // part 3 + 5: draw wireframe with transforms applied
     for (const auto &face : mesh_faces)
     {
-      // get 3 vertices of this triangle
-      Vec3 v0 = norm_verts[face.v0];
-      Vec3 v1 = norm_verts[face.v1];
-      Vec3 v2 = norm_verts[face.v2];
+      Vec3 v0 = apply_transforms(norm_verts[face.v0]);
+      Vec3 v1 = apply_transforms(norm_verts[face.v1]);
+      Vec3 v2 = apply_transforms(norm_verts[face.v2]);
 
-      // orthographic projection: just drop z, use x and y
       draw_line((int)v0.x, (int)v0.y, (int)v1.x, (int)v1.y, MFB_RGB(255, 255, 255));
       draw_line((int)v1.x, (int)v1.y, (int)v2.x, (int)v2.y, MFB_RGB(255, 255, 255));
       draw_line((int)v2.x, (int)v2.y, (int)v0.x, (int)v0.y, MFB_RGB(255, 255, 255));
@@ -561,10 +586,10 @@ int main()
       mu_end_window(ctx);
     }
     // --- Transform Tools window ---
-    if (mu_begin_window(ctx, "Transform Tools", mu_rect(20, 580, 360, 400)))
+    if (mu_begin_window(ctx, "Transform Tools", mu_rect(20, 580, 700, 400)))
     {
       int wt[] = {-1};
-      int w3[] = {-1, -1, -1};
+      int w3[] = {220, 220, -1};
 
       mu_label(ctx, "-- Local Transform --");
 
