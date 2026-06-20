@@ -102,3 +102,158 @@ A real scene contains more than one object. To manage this, an application needs
 Object manipulation usually requires combining multiple mouse inputs to handle different types of transformations intuitively.
 
 * **Task:** Implement a *second* approach for modifying transformations using the mouse (so you have two total, fulfilling the "two approaches" requirement for pairs). For example, if you mapped mouse-dragging to rotation in Part 6, map the mouse scroll wheel to uniformly scale the active object, or map right-click-dragging to translation. Describe both implementations in your report.
+
+
+---
+
+# My Report
+
+**Student:** Mohammad Abu Saleh  
+**ID:** 206380487
+
+---
+
+## Part 0: Introduction to GLM
+
+### Approach
+Integrated GLM via CMake's `FetchContent`, pulling version 1.0.1 directly from the official GLM GitHub repo. Linked it to the executable using `glm::glm` in `target_link_libraries`.
+
+To verify the integration, added a small example in `main()` that creates an identity `glm::mat4`, applies a `glm::translate`, and prints the resulting position to the console.
+
+```cpp
+glm::vec3 position(1.0f, 2.0f, 3.0f);
+glm::mat4 model = glm::mat4(1.0f);
+model = glm::translate(model, position);
+printf("GLM works! Translated position: (%.1f, %.1f, %.1f)\n", model[3][0], model[3][1], model[3][2]);
+```
+
+Verified output: `GLM works! Translated position: (1.0, 2.0, 3.0)`
+
+---
+
+## Part 1: Loading and Inspecting 3D Data
+
+### Approach
+Wrote a simple `.obj` parser (`load_obj`) that reads a file line by line:
+- Lines starting with `v` are parsed as vertices (x, y, z) and stored in `std::vector<Vec3>`
+- Lines starting with `f` are parsed as triangle faces, taking only the vertex index before the `/` (ignoring texture/normal indices), and stored in `std::vector<Face>`
+
+### Test Model
+Created a simple cube in Blender (8 vertices, 12 triangulated faces) and exported it as `cube.obj` with "Triangulate Faces" enabled.
+
+The loaded counts are displayed live in the MicroUI Widgets panel:
+```cpp
+snprintf(mesh_info, sizeof(mesh_info), "Vertices: %d", (int)mesh_verts.size());
+mu_label(ctx, mesh_info);
+snprintf(mesh_info, sizeof(mesh_info), "Faces: %d", (int)mesh_faces.size());
+mu_label(ctx, mesh_info);
+```
+
+Confirmed: `Vertices: 8`, `Faces: 12` — matches the cube exactly.
+
+---
+
+## Part 2: Normalization and the Viewport Transform
+
+### Approach
+Wrote `normalize_mesh()` to remap arbitrary mesh coordinates into the window's pixel space:
+
+1. **Find the bounding box** — loop through all vertices, tracking min/max for x, y, z independently.
+2. **Find the center** — average of min and max for each axis: `cx = (min_x + max_x) / 2`, similarly for y and z.
+3. **Find the largest dimension** — `max_range = max(range_x, range_y, range_z)`. Using a single uniform scale factor (rather than separate x/y/z scales) keeps the object's proportions correct and avoids distortion.
+4. **Compute scale** — scale the largest dimension to 80% of the smaller window dimension: `scale = (min(width, height) * 0.8) / max_range`.
+5. **Remap each vertex** — subtract the center (to move the object to the origin), multiply by scale, then add half the window size (to center it on screen): `n.x = (v.x - cx) * scale + width / 2`.
+
+This guarantees that regardless of the original coordinate range of the model (whether tiny like an ant or huge like a building), it always fits comfortably and centered within the window.
+
+---
+
+## Part 3: Orthographic Projection and Wireframe Rendering
+
+### Approach
+For each triangle face, retrieved its 3 vertices, dropped the z-coordinate (orthographic projection), and drew the 3 connecting edges using the `draw_line` function (Bresenham's algorithm) from HW1.
+
+```cpp
+for (const auto& face : mesh_faces) {
+    Vec3 v0 = norm_verts[face.v0];
+    Vec3 v1 = norm_verts[face.v1];
+    Vec3 v2 = norm_verts[face.v2];
+    draw_line((int)v0.x, (int)v0.y, (int)v1.x, (int)v1.y, MFB_RGB(255,255,255));
+    draw_line((int)v1.x, (int)v1.y, (int)v2.x, (int)v2.y, MFB_RGB(255,255,255));
+    draw_line((int)v2.x, (int)v2.y, (int)v0.x, (int)v0.y, MFB_RGB(255,255,255));
+}
+```
+
+Viewed straight-on (no rotation), the cube's front and back faces project to nearly the same square, with the diagonal lines visible from each face's triangulation split.
+
+### Result
+![Part 3 - Static wireframe cube](../nanorender/assets/before1.png)
+
+---
+
+## Part 4: Transformation Matrices & Immediate Mode GUI
+
+### Approach
+Added a new "Transform Tools" UI window with 6 groups of 3 sliders each (X, Y, Z), covering:
+- Local Translation, Local Rotation, Local Scale
+- World Translation, World Rotation, World Scale
+
+Each group uses `mu_layout_row(ctx, 3, w3, 0)` to lay out 3 sliders side by side, bound directly to `glm::vec3` global variables via pointer (`&local_translation.x`, etc).
+
+One bug encountered: using `{-1, -1, -1}` as column widths caused the 3 sliders to collapse into a single overlapping widget. Fixed by using explicit pixel widths instead: `{220, 220, -1}`.
+
+### Result
+![Part 4 - Transform Tools GUI](../nanorender/assets/local_translate_world_rotate1.png)
+
+---
+
+## Part 5: Applying Transformations
+
+### Approach
+Built `apply_transforms()` which constructs two separate 4x4 matrices using GLM:
+
+- **Local matrix**: translate → rotate (X, Y, Z) → scale, applied first (around the object's own center)
+- **World matrix**: translate → rotate (X, Y, Z) → scale, applied second (around the world origin)
+
+```cpp
+glm::vec4 result = world * local * p;
+```
+
+Since matrix multiplication is not commutative, applying local first then world produces a different result than the reverse order — this is the core distinction between the two frames of reference.
+
+### Comparison 1: Local Translate + World Rotate
+Local Translate X = 80, World Rotate Y ≈ 45. The cube moves from its own center first, then the entire result (including the offset) revolves around the world origin — like a planet orbiting the sun.
+
+![Local translate then world rotate](../nanorender/assets/local_translate_world_rotate.png)
+
+### Comparison 2: World Translate + Local Rotate
+World Translate X = 80, Local Rotate Y ≈ 45. The cube spins in place around its own center first, then the whole spun result is shifted to its new position — like a top spinning then sliding.
+
+![World translate then local rotate](../nanorender/assets/world_translate_local_rotate.png)
+
+Even with similar magnitude values, the visual results are clearly different, demonstrating the non-commutative nature of matrix transforms and the practical difference between local and world frames.
+
+---
+
+## Part 6: Interactive Input Modifiers
+
+### Approach
+Used `mfb_set_keyboard_callback` to intercept arrow key presses and directly modify `world_translation`:
+
+```cpp
+mfb_set_keyboard_callback(
+    [](struct mfb_window *w, mfb_key key, mfb_key_mod mod, bool isPressed) {
+        if (!isPressed) return;
+        const float step = 10.0f;
+        if (key == KB_KEY_RIGHT) world_translation.x += step;
+        else if (key == KB_KEY_LEFT) world_translation.x -= step;
+        else if (key == KB_KEY_UP) world_translation.y -= step;
+        else if (key == KB_KEY_DOWN) world_translation.y += step;
+    },
+    window);
+```
+
+Each arrow key press increments or decrements the relevant axis of `world_translation` by a fixed step (10 units). Since `apply_transforms()` reads this variable every frame, the cube updates its position immediately and interactively as the user holds/presses arrow keys, in addition to the existing slider controls.
+
+### Result
+![Part 6 - Cube moved with arrow keys](../nanorender/assets/moving_arrows.png)
