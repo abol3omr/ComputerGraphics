@@ -22,6 +22,15 @@ extern "C"
 #define WIDTH 1600
 #define HEIGHT 1200
 
+// assignment2, part 4: local and world transformation state
+glm::vec3 local_translation(0.0f, 0.0f, 0.0f);
+glm::vec3 local_rotation(0.0f, 0.0f, 0.0f); // in degrees
+glm::vec3 local_scale(1.0f, 1.0f, 1.0f);
+
+glm::vec3 world_translation(0.0f, 0.0f, 0.0f);
+glm::vec3 world_rotation(0.0f, 0.0f, 0.0f); // in degrees
+glm::vec3 world_scale(1.0f, 1.0f, 1.0f);
+
 static uint32_t g_buffer[WIDTH * HEIGHT];
 float time_speed = 0.05f;  // controls animation speed
 bool frozen = false;       // freeze toggle
@@ -548,6 +557,59 @@ int main()
       {
         line_count = 0;
       }
+
+      mu_end_window(ctx);
+    }
+    // --- Transform Tools window ---
+    if (mu_begin_window(ctx, "Transform Tools", mu_rect(20, 580, 360, 400)))
+    {
+      int wt[] = {-1};
+      int w3[] = {-1, -1, -1};
+
+      mu_label(ctx, "-- Local Transform --");
+
+      mu_label(ctx, "Local Translate X/Y/Z:");
+      mu_layout_row(ctx, 3, w3, 0);
+      mu_slider(ctx, &local_translation.x, -200.0f, 200.0f);
+      mu_slider(ctx, &local_translation.y, -200.0f, 200.0f);
+      mu_slider(ctx, &local_translation.z, -200.0f, 200.0f);
+
+      mu_layout_row(ctx, 1, wt, 0);
+      mu_label(ctx, "Local Rotate X/Y/Z:");
+      mu_layout_row(ctx, 3, w3, 0);
+      mu_slider(ctx, &local_rotation.x, -180.0f, 180.0f);
+      mu_slider(ctx, &local_rotation.y, -180.0f, 180.0f);
+      mu_slider(ctx, &local_rotation.z, -180.0f, 180.0f);
+
+      mu_layout_row(ctx, 1, wt, 0);
+      mu_label(ctx, "Local Scale X/Y/Z:");
+      mu_layout_row(ctx, 3, w3, 0);
+      mu_slider(ctx, &local_scale.x, 0.1f, 3.0f);
+      mu_slider(ctx, &local_scale.y, 0.1f, 3.0f);
+      mu_slider(ctx, &local_scale.z, 0.1f, 3.0f);
+
+      mu_layout_row(ctx, 1, wt, 0);
+      mu_label(ctx, "-- World Transform --");
+
+      mu_label(ctx, "World Translate X/Y/Z:");
+      mu_layout_row(ctx, 3, w3, 0);
+      mu_slider(ctx, &world_translation.x, -200.0f, 200.0f);
+      mu_slider(ctx, &world_translation.y, -200.0f, 200.0f);
+      mu_slider(ctx, &world_translation.z, -200.0f, 200.0f);
+
+      mu_layout_row(ctx, 1, wt, 0);
+      mu_label(ctx, "World Rotate X/Y/Z:");
+      mu_layout_row(ctx, 3, w3, 0);
+      mu_slider(ctx, &world_rotation.x, -180.0f, 180.0f);
+      mu_slider(ctx, &world_rotation.y, -180.0f, 180.0f);
+      mu_slider(ctx, &world_rotation.z, -180.0f, 180.0f);
+
+      mu_layout_row(ctx, 1, wt, 0);
+      mu_label(ctx, "World Scale X/Y/Z:");
+      mu_layout_row(ctx, 3, w3, 0);
+      mu_slider(ctx, &world_scale.x, 0.1f, 3.0f);
+      mu_slider(ctx, &world_scale.y, 0.1f, 3.0f);
+      mu_slider(ctx, &world_scale.z, 0.1f, 3.0f);
 
       mu_end_window(ctx);
     }
