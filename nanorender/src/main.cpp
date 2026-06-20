@@ -272,6 +272,24 @@ int main()
           ui_bridge_char_input(w, c); // pass other keys to UI
       },
       window);
+  // part 6: arrow keys control world translation
+  mfb_set_keyboard_callback(
+      [](struct mfb_window *w, mfb_key key, mfb_key_mod mod, bool isPressed)
+      {
+        if (!isPressed)
+          return; // only react on key press, not release
+        extern glm::vec3 world_translation;
+        const float step = 10.0f;
+        if (key == KB_KEY_RIGHT)
+          world_translation.x += step;
+        else if (key == KB_KEY_LEFT)
+          world_translation.x -= step;
+        else if (key == KB_KEY_UP)
+          world_translation.y -= step; // screen y is flipped
+        else if (key == KB_KEY_DOWN)
+          world_translation.y += step;
+      },
+      window);
   // part 0: glm example - create a simple transformation matrix
   glm::vec3 position(1.0f, 2.0f, 3.0f);
   glm::mat4 model = glm::mat4(1.0f); // identity matrix
