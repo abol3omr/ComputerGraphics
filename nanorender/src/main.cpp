@@ -32,12 +32,20 @@ glm::vec3 world_rotation(0.0f, 0.0f, 0.0f); // in degrees
 glm::vec3 world_scale(1.0f, 1.0f, 1.0f);
 
 static uint32_t g_buffer[WIDTH * HEIGHT];
-float time_speed = 0.05f;  // controls animation speed
-bool frozen = false;       // freeze toggle
-bool red_theme = false;    // color theme toggle
-float freq_slider = 60.0f; // controls ray width
-bool show_axes = false;    // toggle coordinate axes
-bool show_bbox = false;    // toggle bounding box
+float time_speed = 0.05f;                 // controls animation speed
+bool frozen = false;                      // freeze toggle
+bool red_theme = false;                   // color theme toggle
+float freq_slider = 60.0f;                // controls ray width
+bool show_axes = false;                   // toggle coordinate axes
+bool show_bbox = false;                   // toggle bounding box
+glm::vec3 cam_position(0.0f, 0.0f, 0.0f); // camera starts behind the scene
+glm::vec3 cam_rotation(0.0f, 0.0f, 0.0f); // in degrees
+
+// hw3 part 2+3: projection settings
+float cam_fov = 90.0f;        // field of view in degrees
+float cam_near = 0.1f;        // near clipping plane
+float cam_far = 10000.0f;     // far clipping plane
+bool use_perspective = false; // toggle between ortho and perspective
 
 // line storage
 struct Line
@@ -205,12 +213,13 @@ std::vector<Vec3> normalize_mesh(const std::vector<Vec3> &verts, int width, int 
   return normalized;
 }
 
-// part 5: apply local then world transforms to a vertex
+// apply local, world, and camera (view) transforms to a vertex
+// full pipeline: model -> view -> project -> screen
 Vec3 apply_transforms(const Vec3 &v)
 {
   glm::vec4 p(v.x, v.y, v.z, 1.0f);
 
-  // --- local transform: scale -> rotate -> translate (around object center) ---
+  // --- local transform ---
   glm::mat4 local = glm::mat4(1.0f);
   local = glm::translate(local, local_translation);
   local = glm::rotate(local, glm::radians(local_rotation.x), glm::vec3(1, 0, 0));
@@ -218,7 +227,7 @@ Vec3 apply_transforms(const Vec3 &v)
   local = glm::rotate(local, glm::radians(local_rotation.z), glm::vec3(0, 0, 1));
   local = glm::scale(local, local_scale);
 
-  // --- world transform: scale -> rotate -> translate (around world origin) ---
+  // --- world transform ---
   glm::mat4 world = glm::mat4(1.0f);
   world = glm::translate(world, world_translation);
   world = glm::rotate(world, glm::radians(world_rotation.x), glm::vec3(1, 0, 0));
@@ -226,9 +235,43 @@ Vec3 apply_transforms(const Vec3 &v)
   world = glm::rotate(world, glm::radians(world_rotation.z), glm::vec3(0, 0, 1));
   world = glm::scale(world, world_scale);
 
-  // apply local first, then world
-  glm::vec4 result = world * local * p;
-  return Vec3{result.x, result.y, result.z};
+  // --- view (camera) transform ---
+  glm::mat4 view = glm::mat4(1.0f);
+  view = glm::rotate(view, glm::radians(-cam_rotation.x), glm::vec3(1, 0, 0));
+  view = glm::rotate(view, glm::radians(-cam_rotation.y), glm::vec3(0, 1, 0));
+  view = glm::rotate(view, glm::radians(-cam_rotation.z), glm::vec3(0, 0, 1));
+  view = glm::translate(view, -cam_position);
+
+  // apply model and view
+  glm::vec4 view_pos = view * world * local * p;
+
+  // --- projection ---
+  float aspect = (float)WIDTH / (float)HEIGHT;
+  glm::vec4 proj_pos;
+
+  if (use_perspective)
+  {
+    glm::mat4 proj = glm::perspective(glm::radians(cam_fov), aspect, cam_near, cam_far);
+    proj_pos = proj * view_pos;
+    // perspective divide
+    if (proj_pos.w != 0.0f)
+    {
+      proj_pos.x /= proj_pos.w;
+      proj_pos.y /= proj_pos.w;
+    }
+    // convert NDC (-1 to 1) to screen pixels
+    float sx = (proj_pos.x + 1.0f) * 0.5f * WIDTH;
+    float sy = (1.0f - proj_pos.y) * 0.5f * HEIGHT;
+    return Vec3{sx, sy, proj_pos.z};
+  }
+  else
+  {
+    // orthographic: scale and center, no perspective divide
+    float scale = 300.0f;
+    float sx = view_pos.x * scale + WIDTH / 2.0f;
+    float sy = -view_pos.y * scale + HEIGHT / 2.0f;
+    return Vec3{sx, sy, view_pos.z};
+  }
 }
 
 int main()
@@ -282,7 +325,7 @@ int main()
         if (!isPressed)
           return; // only react on key press, not release
         extern glm::vec3 world_translation;
-        const float step = 10.0f;
+        const float step = 0.1f;
         if (key == KB_KEY_RIGHT)
           world_translation.x += step;
         else if (key == KB_KEY_LEFT)
@@ -416,9 +459,9 @@ int main()
     // part 3 + 5: draw wireframe with transforms applied
     for (const auto &face : mesh_faces)
     {
-      Vec3 v0 = apply_transforms(norm_verts[face.v0]);
-      Vec3 v1 = apply_transforms(norm_verts[face.v1]);
-      Vec3 v2 = apply_transforms(norm_verts[face.v2]);
+      Vec3 v0 = apply_transforms(mesh_verts[face.v0]);
+      Vec3 v1 = apply_transforms(mesh_verts[face.v1]);
+      Vec3 v2 = apply_transforms(mesh_verts[face.v2]);
 
       draw_line((int)v0.x, (int)v0.y, (int)v1.x, (int)v1.y, MFB_RGB(255, 255, 255));
       draw_line((int)v1.x, (int)v1.y, (int)v2.x, (int)v2.y, MFB_RGB(255, 255, 255));
@@ -438,12 +481,12 @@ int main()
       // z axis - blue (projected diagonally)
       draw_line(ox, oy, ox + axis_len / 2, oy + axis_len / 2, MFB_RGB(0, 0, 255));
 
-      // local axes at model center in normalized space
-      Vec3 model_center = {(float)WIDTH / 2, (float)HEIGHT / 2, 0.0f};
-      Vec3 center = apply_transforms(model_center);
-      Vec3 x_tip = apply_transforms({model_center.x + axis_len * 0.3f, model_center.y, model_center.z});
-      Vec3 y_tip = apply_transforms({model_center.x, model_center.y + axis_len * 0.3f, model_center.z});
-      Vec3 z_tip = apply_transforms({model_center.x, model_center.y, model_center.z + axis_len * 0.3f});
+      // local axes in model space (cube is -1 to 1)
+      float axis_size = 0.5f;
+      Vec3 center = apply_transforms({0.0f, 0.0f, 0.0f});
+      Vec3 x_tip = apply_transforms({axis_size, 0.0f, 0.0f});
+      Vec3 y_tip = apply_transforms({0.0f, axis_size, 0.0f});
+      Vec3 z_tip = apply_transforms({0.0f, 0.0f, axis_size});
       draw_line((int)center.x, (int)center.y, (int)x_tip.x, (int)x_tip.y, MFB_RGB(255, 100, 100));
       draw_line((int)center.x, (int)center.y, (int)y_tip.x, (int)y_tip.y, MFB_RGB(100, 255, 100));
       draw_line((int)center.x, (int)center.y, (int)z_tip.x, (int)z_tip.y, MFB_RGB(100, 100, 255));
@@ -451,27 +494,29 @@ int main()
 
     if (show_bbox)
     {
-      // compute bounding box of transformed vertices
-      float min_x, max_x, min_y, max_y, min_z, max_z;
-      min_x = max_x = apply_transforms(norm_verts[0]).x;
-      min_y = max_y = apply_transforms(norm_verts[0]).y;
-      min_z = max_z = apply_transforms(norm_verts[0]).z;
-      for (const auto &v : norm_verts)
+      // compute bounding box in original model space
+      float min_x = mesh_verts[0].x, max_x = mesh_verts[0].x;
+      float min_y = mesh_verts[0].y, max_y = mesh_verts[0].y;
+      float min_z = mesh_verts[0].z, max_z = mesh_verts[0].z;
+      for (const auto &v : mesh_verts)
       {
-        Vec3 t = apply_transforms(v);
-        min_x = fminf(min_x, t.x);
-        max_x = fmaxf(max_x, t.x);
-        min_y = fminf(min_y, t.y);
-        max_y = fmaxf(max_y, t.y);
-        min_z = fminf(min_z, t.z);
-        max_z = fmaxf(max_z, t.z);
+        min_x = fminf(min_x, v.x);
+        max_x = fmaxf(max_x, v.x);
+        min_y = fminf(min_y, v.y);
+        max_y = fmaxf(max_y, v.y);
+        min_z = fminf(min_z, v.z);
+        max_z = fmaxf(max_z, v.z);
       }
 
-      // 8 corners of the bounding box
-      Vec3 corners[8] = {
+      // 8 corners in model space, then project each through full pipeline
+      Vec3 raw_corners[8] = {
           {min_x, min_y, min_z}, {max_x, min_y, min_z}, {max_x, max_y, min_z}, {min_x, max_y, min_z}, {min_x, min_y, max_z}, {max_x, min_y, max_z}, {max_x, max_y, max_z}, {min_x, max_y, max_z}};
 
-      uint32_t bbox_color = MFB_RGB(255, 255, 0); // yellow
+      Vec3 corners[8];
+      for (int i = 0; i < 8; i++)
+        corners[i] = apply_transforms(raw_corners[i]);
+
+      uint32_t bbox_color = MFB_RGB(255, 255, 0);
       // bottom face
       draw_line((int)corners[0].x, (int)corners[0].y, (int)corners[1].x, (int)corners[1].y, bbox_color);
       draw_line((int)corners[1].x, (int)corners[1].y, (int)corners[2].x, (int)corners[2].y, bbox_color);
@@ -685,9 +730,9 @@ int main()
 
       mu_label(ctx, "Local Translate X/Y/Z:");
       mu_layout_row(ctx, 3, w3, 0);
-      mu_slider(ctx, &local_translation.x, -200.0f, 200.0f);
-      mu_slider(ctx, &local_translation.y, -200.0f, 200.0f);
-      mu_slider(ctx, &local_translation.z, -200.0f, 200.0f);
+      mu_slider(ctx, &local_translation.x, -3.0f, 3.0f);
+      mu_slider(ctx, &local_translation.y, -3.0f, 3.0f);
+      mu_slider(ctx, &local_translation.z, -3.0f, 3.0f);
 
       mu_layout_row(ctx, 1, wt, 0);
       mu_label(ctx, "Local Rotate X/Y/Z:");
@@ -708,9 +753,9 @@ int main()
 
       mu_label(ctx, "World Translate X/Y/Z:");
       mu_layout_row(ctx, 3, w3, 0);
-      mu_slider(ctx, &world_translation.x, -200.0f, 200.0f);
-      mu_slider(ctx, &world_translation.y, -200.0f, 200.0f);
-      mu_slider(ctx, &world_translation.z, -200.0f, 200.0f);
+      mu_slider(ctx, &world_translation.x, -3.0f, 3.0f);
+      mu_slider(ctx, &world_translation.y, -3.0f, 3.0f);
+      mu_slider(ctx, &world_translation.z, -3.0f, 3.0f);
 
       mu_layout_row(ctx, 1, wt, 0);
       mu_label(ctx, "World Rotate X/Y/Z:");
@@ -725,6 +770,28 @@ int main()
       mu_slider(ctx, &world_scale.x, 0.1f, 3.0f);
       mu_slider(ctx, &world_scale.y, 0.1f, 3.0f);
       mu_slider(ctx, &world_scale.z, 0.1f, 3.0f);
+
+      mu_end_window(ctx);
+    }
+
+    // --- Camera window ---
+    if (mu_begin_window(ctx, "Camera", mu_rect(730, 20, 500, 200)))
+    {
+      int wc[] = {-1};
+      int w3[] = {150, 150, -1};
+
+      mu_label(ctx, "Camera Position X/Y/Z:");
+      mu_layout_row(ctx, 3, w3, 0);
+      mu_slider(ctx, &cam_position.x, -5.0f, 5.0f);
+      mu_slider(ctx, &cam_position.y, -5.0f, 5.0f);
+      mu_slider(ctx, &cam_position.z, -5.0f, 5.0f);
+
+      mu_layout_row(ctx, 1, wc, 0);
+      mu_label(ctx, "Camera Rotation X/Y/Z:");
+      mu_layout_row(ctx, 3, w3, 0);
+      mu_slider(ctx, &cam_rotation.x, -180.0f, 180.0f);
+      mu_slider(ctx, &cam_rotation.y, -180.0f, 180.0f);
+      mu_slider(ctx, &cam_rotation.z, -180.0f, 180.0f);
 
       mu_end_window(ctx);
     }
