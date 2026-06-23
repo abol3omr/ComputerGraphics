@@ -36,6 +36,9 @@ float time_speed = 0.05f;  // controls animation speed
 bool frozen = false;       // freeze toggle
 bool red_theme = false;    // color theme toggle
 float freq_slider = 60.0f; // controls ray width
+bool show_axes = false;    // toggle coordinate axes
+bool show_bbox = false;    // toggle bounding box
+
 // line storage
 struct Line
 {
@@ -422,6 +425,70 @@ int main()
       draw_line((int)v2.x, (int)v2.y, (int)v0.x, (int)v0.y, MFB_RGB(255, 255, 255));
     }
 
+    // hw3 part 1: draw coordinate axes and bounding box
+    if (show_axes)
+    {
+      // world axes at origin (0,0,0) -> screen center
+      int ox = WIDTH / 2, oy = HEIGHT / 2;
+      int axis_len = 100;
+      // x axis - red
+      draw_line(ox, oy, ox + axis_len, oy, MFB_RGB(255, 0, 0));
+      // y axis - green (screen y is flipped)
+      draw_line(ox, oy, ox, oy - axis_len, MFB_RGB(0, 255, 0));
+      // z axis - blue (projected diagonally)
+      draw_line(ox, oy, ox + axis_len / 2, oy + axis_len / 2, MFB_RGB(0, 0, 255));
+
+      // local axes at model center in normalized space
+      Vec3 model_center = {(float)WIDTH / 2, (float)HEIGHT / 2, 0.0f};
+      Vec3 center = apply_transforms(model_center);
+      Vec3 x_tip = apply_transforms({model_center.x + axis_len * 0.3f, model_center.y, model_center.z});
+      Vec3 y_tip = apply_transforms({model_center.x, model_center.y + axis_len * 0.3f, model_center.z});
+      Vec3 z_tip = apply_transforms({model_center.x, model_center.y, model_center.z + axis_len * 0.3f});
+      draw_line((int)center.x, (int)center.y, (int)x_tip.x, (int)x_tip.y, MFB_RGB(255, 100, 100));
+      draw_line((int)center.x, (int)center.y, (int)y_tip.x, (int)y_tip.y, MFB_RGB(100, 255, 100));
+      draw_line((int)center.x, (int)center.y, (int)z_tip.x, (int)z_tip.y, MFB_RGB(100, 100, 255));
+    }
+
+    if (show_bbox)
+    {
+      // compute bounding box of transformed vertices
+      float min_x, max_x, min_y, max_y, min_z, max_z;
+      min_x = max_x = apply_transforms(norm_verts[0]).x;
+      min_y = max_y = apply_transforms(norm_verts[0]).y;
+      min_z = max_z = apply_transforms(norm_verts[0]).z;
+      for (const auto &v : norm_verts)
+      {
+        Vec3 t = apply_transforms(v);
+        min_x = fminf(min_x, t.x);
+        max_x = fmaxf(max_x, t.x);
+        min_y = fminf(min_y, t.y);
+        max_y = fmaxf(max_y, t.y);
+        min_z = fminf(min_z, t.z);
+        max_z = fmaxf(max_z, t.z);
+      }
+
+      // 8 corners of the bounding box
+      Vec3 corners[8] = {
+          {min_x, min_y, min_z}, {max_x, min_y, min_z}, {max_x, max_y, min_z}, {min_x, max_y, min_z}, {min_x, min_y, max_z}, {max_x, min_y, max_z}, {max_x, max_y, max_z}, {min_x, max_y, max_z}};
+
+      uint32_t bbox_color = MFB_RGB(255, 255, 0); // yellow
+      // bottom face
+      draw_line((int)corners[0].x, (int)corners[0].y, (int)corners[1].x, (int)corners[1].y, bbox_color);
+      draw_line((int)corners[1].x, (int)corners[1].y, (int)corners[2].x, (int)corners[2].y, bbox_color);
+      draw_line((int)corners[2].x, (int)corners[2].y, (int)corners[3].x, (int)corners[3].y, bbox_color);
+      draw_line((int)corners[3].x, (int)corners[3].y, (int)corners[0].x, (int)corners[0].y, bbox_color);
+      // top face
+      draw_line((int)corners[4].x, (int)corners[4].y, (int)corners[5].x, (int)corners[5].y, bbox_color);
+      draw_line((int)corners[5].x, (int)corners[5].y, (int)corners[6].x, (int)corners[6].y, bbox_color);
+      draw_line((int)corners[6].x, (int)corners[6].y, (int)corners[7].x, (int)corners[7].y, bbox_color);
+      draw_line((int)corners[7].x, (int)corners[7].y, (int)corners[4].x, (int)corners[4].y, bbox_color);
+      // vertical edges
+      draw_line((int)corners[0].x, (int)corners[0].y, (int)corners[4].x, (int)corners[4].y, bbox_color);
+      draw_line((int)corners[1].x, (int)corners[1].y, (int)corners[5].x, (int)corners[5].y, bbox_color);
+      draw_line((int)corners[2].x, (int)corners[2].y, (int)corners[6].x, (int)corners[6].y, bbox_color);
+      draw_line((int)corners[3].x, (int)corners[3].y, (int)corners[7].x, (int)corners[7].y, bbox_color);
+    }
+
     // 3. UI Logic
     static float slider_val = 50.0f;
     static float number_val = 3.14f;
@@ -495,6 +562,11 @@ int main()
 
       snprintf(mesh_info, sizeof(mesh_info), "Faces: %d", (int)mesh_faces.size());
       mu_label(ctx, mesh_info);
+
+      // hw3 part 1: debug toggles
+      mu_layout_row(ctx, 1, w1, 0);
+      mu_checkbox(ctx, "Show Axes", (int *)&show_axes);
+      mu_checkbox(ctx, "Show Bounding Box", (int *)&show_bbox);
 
       // header (collapsible section)
       if (mu_header(ctx, "mu_header: collapsible section"))

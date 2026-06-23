@@ -66,7 +66,7 @@ To keep the repository clean and the reports professional, follow these standard
 ## Table of Contents
 | Assignment | Link |
 | :--- | :--- |
-| **Project 1: Basic Graphics and Immediate Mode GUI** | [View Report](./assignments/hw1.md) |
+| **Hw1: Basic Graphics and Immediate Mode GUI** | [View Report](./assignments/hw1.md) |
 | **HW2: Wireframe Viewer and Geometric Transformations** | [View Report](./assignments/hw2.md) |
 
 ---
