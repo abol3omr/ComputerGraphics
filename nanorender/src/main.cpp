@@ -40,6 +40,8 @@ bool show_axes = false;                   // toggle coordinate axes
 bool show_bbox = false;                   // toggle bounding box
 glm::vec3 cam_position(0.0f, 0.0f, 0.0f); // camera starts behind the scene
 glm::vec3 cam_rotation(0.0f, 0.0f, 0.0f); // in degrees
+bool show_face_normals = false;           // toggle face normal debug lines
+bool show_vertex_normals = false;         // toggle vertex normal debug lines
 
 // hw3 part 2+3: projection settings
 float cam_fov = 90.0f;        // field of view in degrees
@@ -274,6 +276,15 @@ Vec3 apply_transforms(const Vec3 &v)
   }
 }
 
+// compute face normal using cross product of triangle edges
+Vec3 compute_face_normal(const Vec3 &v0, const Vec3 &v1, const Vec3 &v2)
+{
+  glm::vec3 a(v1.x - v0.x, v1.y - v0.y, v1.z - v0.z);
+  glm::vec3 b(v2.x - v0.x, v2.y - v0.y, v2.z - v0.z);
+  glm::vec3 n = glm::normalize(glm::cross(a, b));
+  return Vec3{n.x, n.y, n.z};
+}
+
 int main()
 {
   struct mfb_window *window =
@@ -492,6 +503,52 @@ int main()
       draw_line((int)center.x, (int)center.y, (int)z_tip.x, (int)z_tip.y, MFB_RGB(100, 100, 255));
     }
 
+    // hw3 part 4: draw face and vertex normals
+    if (show_face_normals || show_vertex_normals)
+    {
+      float normal_len = 0.3f; // length of normal lines in model space
+
+      // compute vertex normals by averaging face normals
+      std::vector<glm::vec3> vert_normals(mesh_verts.size(), glm::vec3(0.0f));
+
+      for (const auto &face : mesh_faces)
+      {
+        Vec3 v0 = mesh_verts[face.v0];
+        Vec3 v1 = mesh_verts[face.v1];
+        Vec3 v2 = mesh_verts[face.v2];
+
+        Vec3 fn = compute_face_normal(v0, v1, v2);
+
+        if (show_face_normals)
+        {
+          // face center
+          Vec3 fc = {(v0.x + v1.x + v2.x) / 3.0f, (v0.y + v1.y + v2.y) / 3.0f, (v0.z + v1.z + v2.z) / 3.0f};
+          Vec3 fc_tip = {fc.x + fn.x * normal_len, fc.y + fn.y * normal_len, fc.z + fn.z * normal_len};
+          Vec3 pfc = apply_transforms(fc);
+          Vec3 ptip = apply_transforms(fc_tip);
+          draw_line((int)pfc.x, (int)pfc.y, (int)ptip.x, (int)ptip.y, MFB_RGB(255, 128, 0));
+        }
+
+        // accumulate for vertex normals
+        vert_normals[face.v0] += glm::vec3(fn.x, fn.y, fn.z);
+        vert_normals[face.v1] += glm::vec3(fn.x, fn.y, fn.z);
+        vert_normals[face.v2] += glm::vec3(fn.x, fn.y, fn.z);
+      }
+
+      if (show_vertex_normals)
+      {
+        for (int i = 0; i < (int)mesh_verts.size(); i++)
+        {
+          glm::vec3 vn = glm::normalize(vert_normals[i]);
+          Vec3 v = mesh_verts[i];
+          Vec3 v_tip = {v.x + vn.x * normal_len, v.y + vn.y * normal_len, v.z + vn.z * normal_len};
+          Vec3 pv = apply_transforms(v);
+          Vec3 ptip = apply_transforms(v_tip);
+          draw_line((int)pv.x, (int)pv.y, (int)ptip.x, (int)ptip.y, MFB_RGB(0, 255, 255));
+        }
+      }
+    }
+
     if (show_bbox)
     {
       // compute bounding box in original model space
@@ -612,6 +669,8 @@ int main()
       mu_layout_row(ctx, 1, w1, 0);
       mu_checkbox(ctx, "Show Axes", (int *)&show_axes);
       mu_checkbox(ctx, "Show Bounding Box", (int *)&show_bbox);
+      mu_checkbox(ctx, "Show Face Normals", (int *)&show_face_normals);
+      mu_checkbox(ctx, "Show Vertex Normals", (int *)&show_vertex_normals);
 
       // header (collapsible section)
       if (mu_header(ctx, "mu_header: collapsible section"))
