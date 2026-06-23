@@ -793,6 +793,14 @@ int main()
       mu_slider(ctx, &cam_rotation.y, -180.0f, 180.0f);
       mu_slider(ctx, &cam_rotation.z, -180.0f, 180.0f);
 
+      // perspective toggle and fov
+      mu_layout_row(ctx, 1, wc, 0);
+      mu_checkbox(ctx, "Perspective Mode", (int *)&use_perspective);
+
+      mu_layout_row(ctx, 1, wc, 0);
+      mu_label(ctx, "Field of View:");
+      mu_slider(ctx, &cam_fov, 10.0f, 170.0f);
+
       mu_end_window(ctx);
     }
 
