@@ -58,3 +58,72 @@ Finally, write a visualization mode: Map the raw floating-point values in your Z
 * **Background:** When drawing adjacent triangles that share an edge, floating-point rounding errors often cause pixels exactly on the edge to either be drawn twice, or not at all (creating tiny gaps or "seams" in your model). Modern GPUs solve this using strict Top-Left Fill Rules.
 
 * **Task:** Research the Top-Left Fill Rule (or tie-breaking rules for Barycentric coordinates). Implement edge-tie-breaking in your rasterizer so that shared edges are completely seamless and no pixel is ever drawn twice.
+
+
+---
+
+# My Report
+
+**Student:** Mohammad Abu Saleh  
+**ID:** 206380487
+
+---
+
+## Part 1: Bounding Box Rasterization (Debugging)
+
+### Approach
+For each triangle in the mesh, projected its 3 vertices through the full pipeline (`apply_transforms`), then computed the 2D bounding rectangle (min/max x and y). Filled every pixel inside that rectangle with a random solid color unique to that triangle index (generated using `srand(index * 1234567)`). The result is a blocky abstract view showing overlapping colored rectangles — one per triangle.
+
+This debug view clearly demonstrates the **Painter's Algorithm problem**: later triangles simply overwrite earlier ones regardless of depth, causing incorrect overlapping.
+
+### Result
+![Part 1 - Bounding box debug view](../nanorender/assets/bounding_box.png)
+
+---
+
+## Part 2: Triangle Filling with Barycentric Coordinates
+
+### Approach
+Used the AI assistant to explore and derive Barycentric coordinates. For any point `(px, py)` inside a triangle's bounding box, computed three weights α, β, γ using the formula:
+
+```cpp
+float denom = (y1 - y2) * (x0 - x2) + (x2 - x1) * (y0 - y2);
+alpha = ((y1 - y2) * (px - x2) + (x2 - x1) * (py - y2)) / denom;
+beta  = ((y2 - y0) * (px - x2) + (x0 - x2) * (py - y2)) / denom;
+gamma = 1.0f - alpha - beta;
+```
+
+If all three weights are ≥ 0, the pixel is inside the triangle and gets colored. Each triangle has a random unique color. The result is a solid filled 3D object, but with visible overlapping artifacts — triangles from the back of the model draw on top of front-facing ones depending on processing order.
+
+### Result
+![Part 2 - Filled triangles without Z-buffer](../nanorender/assets/triangles_Z.png)
+
+---
+
+## Part 3: The Z-Buffer Algorithm
+
+### Approach
+Created a `float z_buffer[WIDTH * HEIGHT]` array initialized to `1.0f` (far plane) at the start of every frame. During rasterization, for each pixel that passes the barycentric test, interpolated its depth using the barycentric weights:
+
+```cpp
+float depth = alpha * v0.z + beta * v1.z + gamma * v2.z;
+```
+
+Then performed the depth test — only draw the pixel if its depth is less than the current Z-buffer value:
+
+```cpp
+if (depth < z_buffer[idx]) {
+    z_buffer[idx] = depth;
+    g_buffer[idx] = color;
+}
+```
+
+The overlapping artifacts from Part 2 instantly disappeared — each pixel now correctly shows the closest triangle's color.
+
+**Z-Buffer Visualization:** Mapped the raw depth values to grayscale — closer pixels appear lighter, further pixels appear darker. Added a UI toggle to switch between color view and depth map view.
+
+### Color Buffer Result
+![Part 3 - Filled triangles with Z-buffer](../nanorender/assets/filled_triangles.png)
+
+### Z-Buffer Visualization
+![Part 3 - Z-buffer depth map](../nanorender/assets/Z_buffer.png)
