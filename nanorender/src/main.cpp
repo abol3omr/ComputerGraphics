@@ -299,6 +299,19 @@ uint32_t triangle_color(int index)
   uint8_t b = rand() % 200 + 55;
   return MFB_RGB(r, g, b);
 }
+
+// compute barycentric coordinates for point (px, py) in triangle (v0, v1, v2)
+void barycentric(float px, float py,
+                 float x0, float y0,
+                 float x1, float y1,
+                 float x2, float y2,
+                 float &alpha, float &beta, float &gamma)
+{
+  float denom = (y1 - y2) * (x0 - x2) + (x2 - x1) * (y0 - y2);
+  alpha = ((y1 - y2) * (px - x2) + (x2 - x1) * (py - y2)) / denom;
+  beta = ((y2 - y0) * (px - x2) + (x0 - x2) * (py - y2)) / denom;
+  gamma = 1.0f - alpha - beta;
+}
 int main()
 {
   struct mfb_window *window =
@@ -521,6 +534,52 @@ int main()
         for (int y = min_y; y <= max_y; y++)
           for (int x = min_x; x <= max_x; x++)
             g_buffer[y * WIDTH + x] = color;
+      }
+    }
+
+    // hw4 part 2: fill triangles with barycentric coordinates
+    if (fill_triangles)
+    {
+      int face_idx = 0;
+      for (const auto &face : mesh_faces)
+      {
+        Vec3 v0 = apply_transforms(mesh_verts[face.v0]);
+        Vec3 v1 = apply_transforms(mesh_verts[face.v1]);
+        Vec3 v2 = apply_transforms(mesh_verts[face.v2]);
+
+        // compute 2D bounding box
+        int min_x = (int)fminf(v0.x, fminf(v1.x, v2.x));
+        int max_x = (int)fmaxf(v0.x, fmaxf(v1.x, v2.x));
+        int min_y = (int)fminf(v0.y, fminf(v1.y, v2.y));
+        int max_y = (int)fmaxf(v0.y, fmaxf(v1.y, v2.y));
+
+        // clamp to screen
+        min_x = std::max(min_x, 0);
+        max_x = std::min(max_x, WIDTH - 1);
+        min_y = std::max(min_y, 0);
+        max_y = std::min(max_y, HEIGHT - 1);
+
+        uint32_t color = triangle_color(face_idx++);
+
+        // for each pixel in bounding box
+        for (int y = min_y; y <= max_y; y++)
+        {
+          for (int x = min_x; x <= max_x; x++)
+          {
+            float alpha, beta, gamma;
+            barycentric((float)x, (float)y,
+                        v0.x, v0.y,
+                        v1.x, v1.y,
+                        v2.x, v2.y,
+                        alpha, beta, gamma);
+
+            // if all weights >= 0, pixel is inside triangle
+            if (alpha >= 0 && beta >= 0 && gamma >= 0)
+            {
+              g_buffer[y * WIDTH + x] = color;
+            }
+          }
+        }
       }
     }
 
