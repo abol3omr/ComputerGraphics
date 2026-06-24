@@ -54,6 +54,9 @@ bool show_raster_bbox = false; // part 1: bounding box rasterization debug
 bool fill_triangles = false;   // part 2: fill triangles with solid colors
 bool show_zbuffer = false;     // part 3: show depth map
 
+// hw4 part 3: z-buffer
+static float z_buffer[WIDTH * HEIGHT];
+
 // line storage
 struct Line
 {
@@ -448,6 +451,9 @@ int main()
       }
       g_buffer[i] = MFB_RGB(r, g, b);
     }
+    // hw4 part 3: clear z-buffer at start of frame
+    for (int i = 0; i < WIDTH * HEIGHT; i++)
+      z_buffer[i] = 1.0f; // initialize to far plane (max depth)
 
     if (!frozen)
       time += time_speed;
@@ -537,7 +543,53 @@ int main()
       }
     }
 
-    // hw4 part 2: fill triangles with barycentric coordinates
+    // // hw4 part 2: fill triangles with barycentric coordinates
+    // if (fill_triangles)
+    // {
+    //   int face_idx = 0;
+    //   for (const auto &face : mesh_faces)
+    //   {
+    //     Vec3 v0 = apply_transforms(mesh_verts[face.v0]);
+    //     Vec3 v1 = apply_transforms(mesh_verts[face.v1]);
+    //     Vec3 v2 = apply_transforms(mesh_verts[face.v2]);
+
+    //     // compute 2D bounding box
+    //     int min_x = (int)fminf(v0.x, fminf(v1.x, v2.x));
+    //     int max_x = (int)fmaxf(v0.x, fmaxf(v1.x, v2.x));
+    //     int min_y = (int)fminf(v0.y, fminf(v1.y, v2.y));
+    //     int max_y = (int)fmaxf(v0.y, fmaxf(v1.y, v2.y));
+
+    //     // clamp to screen
+    //     min_x = std::max(min_x, 0);
+    //     max_x = std::min(max_x, WIDTH - 1);
+    //     min_y = std::max(min_y, 0);
+    //     max_y = std::min(max_y, HEIGHT - 1);
+
+    //     uint32_t color = triangle_color(face_idx++);
+
+    //     // for each pixel in bounding box
+    //     for (int y = min_y; y <= max_y; y++)
+    //     {
+    //       for (int x = min_x; x <= max_x; x++)
+    //       {
+    //         float alpha, beta, gamma;
+    //         barycentric((float)x, (float)y,
+    //                     v0.x, v0.y,
+    //                     v1.x, v1.y,
+    //                     v2.x, v2.y,
+    //                     alpha, beta, gamma);
+
+    //         // if all weights >= 0, pixel is inside triangle
+    //         if (alpha >= 0 && beta >= 0 && gamma >= 0)
+    //         {
+    //           g_buffer[y * WIDTH + x] = color;
+    //         }
+    //       }
+    //     }
+    //   }
+    // }
+
+    // hw4 part 2+3: fill triangles with barycentric coordinates and z-buffer
     if (fill_triangles)
     {
       int face_idx = 0;
@@ -561,7 +613,6 @@ int main()
 
         uint32_t color = triangle_color(face_idx++);
 
-        // for each pixel in bounding box
         for (int y = min_y; y <= max_y; y++)
         {
           for (int x = min_x; x <= max_x; x++)
@@ -573,12 +624,47 @@ int main()
                         v2.x, v2.y,
                         alpha, beta, gamma);
 
-            // if all weights >= 0, pixel is inside triangle
             if (alpha >= 0 && beta >= 0 && gamma >= 0)
             {
-              g_buffer[y * WIDTH + x] = color;
+              // interpolate depth using barycentric weights
+              float depth = alpha * v0.z + beta * v1.z + gamma * v2.z;
+
+              // depth test
+              int idx = y * WIDTH + x;
+              if (depth < z_buffer[idx])
+              {
+                z_buffer[idx] = depth;
+                g_buffer[idx] = color;
+              }
             }
           }
+        }
+      }
+    }
+
+    // hw4 part 3: z-buffer visualization
+    if (show_zbuffer)
+    {
+      // find min/max depth for normalization
+      float min_d = 1.0f, max_d = -1.0f;
+      for (int i = 0; i < WIDTH * HEIGHT; i++)
+      {
+        if (z_buffer[i] < 1.0f)
+        {
+          min_d = fminf(min_d, z_buffer[i]);
+          max_d = fmaxf(max_d, z_buffer[i]);
+        }
+      }
+      float range = max_d - min_d;
+      if (range < 0.0001f)
+        range = 1.0f;
+
+      for (int i = 0; i < WIDTH * HEIGHT; i++)
+      {
+        if (z_buffer[i] < 1.0f)
+        {
+          uint8_t gray = (uint8_t)((1.0f - (z_buffer[i] - min_d) / range) * 255);
+          g_buffer[i] = MFB_RGB(gray, gray, gray);
         }
       }
     }
