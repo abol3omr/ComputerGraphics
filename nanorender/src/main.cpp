@@ -7,6 +7,7 @@
 #include <fstream>
 #include <sstream>
 #include <string>
+#include <algorithm>
 
 // assignment2
 #include <glm/glm.hpp>
@@ -48,6 +49,10 @@ float cam_fov = 90.0f;        // field of view in degrees
 float cam_near = 0.1f;        // near clipping plane
 float cam_far = 10000.0f;     // far clipping plane
 bool use_perspective = false; // toggle between ortho and perspective
+
+bool show_raster_bbox = false; // part 1: bounding box rasterization debug
+bool fill_triangles = false;   // part 2: fill triangles with solid colors
+bool show_zbuffer = false;     // part 3: show depth map
 
 // line storage
 struct Line
@@ -285,6 +290,15 @@ Vec3 compute_face_normal(const Vec3 &v0, const Vec3 &v1, const Vec3 &v2)
   return Vec3{n.x, n.y, n.z};
 }
 
+// generate a random color for each triangle index
+uint32_t triangle_color(int index)
+{
+  srand(index * 1234567);
+  uint8_t r = rand() % 200 + 55;
+  uint8_t g = rand() % 200 + 55;
+  uint8_t b = rand() % 200 + 55;
+  return MFB_RGB(r, g, b);
+}
 int main()
 {
   struct mfb_window *window =
@@ -479,6 +493,37 @@ int main()
       draw_line((int)v2.x, (int)v2.y, (int)v0.x, (int)v0.y, MFB_RGB(255, 255, 255));
     }
 
+    // hw4 part 1: bounding box rasterization debug
+    if (show_raster_bbox)
+    {
+      int face_idx = 0;
+      for (const auto &face : mesh_faces)
+      {
+        Vec3 v0 = apply_transforms(mesh_verts[face.v0]);
+        Vec3 v1 = apply_transforms(mesh_verts[face.v1]);
+        Vec3 v2 = apply_transforms(mesh_verts[face.v2]);
+
+        // compute 2D bounding box
+        int min_x = (int)fminf(v0.x, fminf(v1.x, v2.x));
+        int max_x = (int)fmaxf(v0.x, fmaxf(v1.x, v2.x));
+        int min_y = (int)fminf(v0.y, fminf(v1.y, v2.y));
+        int max_y = (int)fmaxf(v0.y, fmaxf(v1.y, v2.y));
+
+        // clamp to screen
+        min_x = std::max(min_x, 0);
+        max_x = std::min(max_x, WIDTH - 1);
+        min_y = std::max(min_y, 0);
+        max_y = std::min(max_y, HEIGHT - 1);
+
+        uint32_t color = triangle_color(face_idx++);
+
+        // fill bounding box with solid color
+        for (int y = min_y; y <= max_y; y++)
+          for (int x = min_x; x <= max_x; x++)
+            g_buffer[y * WIDTH + x] = color;
+      }
+    }
+
     // hw3 part 1: draw coordinate axes and bounding box
     if (show_axes)
     {
@@ -669,6 +714,10 @@ int main()
       mu_layout_row(ctx, 1, w1, 0);
       mu_checkbox(ctx, "Show Axes", (int *)&show_axes);
       mu_checkbox(ctx, "Show Bounding Box", (int *)&show_bbox);
+      // hw4 toggles
+      mu_checkbox(ctx, "Show Raster BBox", (int *)&show_raster_bbox);
+      mu_checkbox(ctx, "Fill Triangles", (int *)&fill_triangles);
+      mu_checkbox(ctx, "Show Z-Buffer", (int *)&show_zbuffer);
       mu_checkbox(ctx, "Show Face Normals", (int *)&show_face_normals);
       mu_checkbox(ctx, "Show Vertex Normals", (int *)&show_vertex_normals);
 
