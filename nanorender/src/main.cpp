@@ -23,6 +23,40 @@ extern "C"
 #define WIDTH 1280
 #define HEIGHT 800
 
+
+
+// hw5 part 1: light and material structs
+struct PointLight
+{
+  glm::vec3 position;
+  glm::vec3 ambient;  // RGB ambient color
+  glm::vec3 diffuse;  // RGB diffuse color
+  glm::vec3 specular; // RGB specular color
+};
+
+struct Material
+{
+  glm::vec3 ambient;  // how much ambient light it reflects
+  glm::vec3 diffuse;  // how much diffuse light it reflects
+  glm::vec3 specular; // how much specular light it reflects
+  float shininess;    // sharpness of specular highlight
+};
+
+// hw5 part 1: default light and material
+PointLight light = {
+    glm::vec3(2.0f, 2.0f, -2.0f), // position
+    glm::vec3(0.2f, 0.2f, 0.2f),  // ambient
+    glm::vec3(0.8f, 0.8f, 0.8f),  // diffuse
+    glm::vec3(1.0f, 1.0f, 1.0f)   // specular
+};
+
+Material material = {
+    glm::vec3(1.0f, 0.5f, 0.3f), // ambient (orange-ish)
+    glm::vec3(1.0f, 0.5f, 0.3f), // diffuse
+    glm::vec3(0.5f, 0.5f, 0.5f), // specular
+    32.0f                        // shininess
+};
+
 // assignment2, part 4: local and world transformation state
 glm::vec3 local_translation(0.0f, 0.0f, 0.0f);
 glm::vec3 local_rotation(0.0f, 0.0f, 0.0f); // in degrees
@@ -75,6 +109,7 @@ static int draw_start_y = 0;
 float color_r = 255.0f;
 float color_g = 255.0f;
 float color_b = 255.0f;
+
 
 // bresenham's line algorithm
 // handles all slopes using switch and reflect approach
@@ -315,6 +350,7 @@ void barycentric(float px, float py,
   beta = ((y2 - y0) * (px - x2) + (x0 - x2) * (py - y2)) / denom;
   gamma = 1.0f - alpha - beta;
 }
+
 int main()
 {
   struct mfb_window *window =
@@ -611,7 +647,14 @@ int main()
         min_y = std::max(min_y, 0);
         max_y = std::min(max_y, HEIGHT - 1);
 
-        uint32_t color = triangle_color(face_idx++);
+        face_idx++;
+        // hw5 part 1: ambient lighting
+        glm::vec3 ambient = light.ambient * material.ambient;
+        ambient = glm::clamp(ambient, 0.0f, 1.0f);
+        uint32_t color = MFB_RGB(
+            (uint8_t)(ambient.r * 255),
+            (uint8_t)(ambient.g * 255),
+            (uint8_t)(ambient.b * 255));
 
         for (int y = min_y; y <= max_y; y++)
         {
@@ -1053,6 +1096,46 @@ int main()
       mu_layout_row(ctx, 1, wc, 0);
       mu_label(ctx, "Field of View:");
       mu_slider(ctx, &cam_fov, 10.0f, 170.0f);
+
+      mu_end_window(ctx);
+    }
+
+    // --- Lighting window ---
+    if (mu_begin_window(ctx, "Lighting", mu_rect(730, 230, 500, 350)))
+    {
+      int wl[] = {-1};
+      int w3[] = {150, 150, -1};
+
+      mu_label(ctx, "Light Position X/Y/Z:");
+      mu_layout_row(ctx, 3, w3, 0);
+      mu_slider(ctx, &light.position.x, -5.0f, 5.0f);
+      mu_slider(ctx, &light.position.y, -5.0f, 5.0f);
+      mu_slider(ctx, &light.position.z, -5.0f, 5.0f);
+
+      mu_layout_row(ctx, 1, wl, 0);
+      mu_label(ctx, "Ambient R/G/B:");
+      mu_layout_row(ctx, 3, w3, 0);
+      mu_slider(ctx, &light.ambient.x, 0.0f, 1.0f);
+      mu_slider(ctx, &light.ambient.y, 0.0f, 1.0f);
+      mu_slider(ctx, &light.ambient.z, 0.0f, 1.0f);
+
+      mu_layout_row(ctx, 1, wl, 0);
+      mu_label(ctx, "Diffuse R/G/B:");
+      mu_layout_row(ctx, 3, w3, 0);
+      mu_slider(ctx, &light.diffuse.x, 0.0f, 1.0f);
+      mu_slider(ctx, &light.diffuse.y, 0.0f, 1.0f);
+      mu_slider(ctx, &light.diffuse.z, 0.0f, 1.0f);
+
+      mu_layout_row(ctx, 1, wl, 0);
+      mu_label(ctx, "Specular R/G/B:");
+      mu_layout_row(ctx, 3, w3, 0);
+      mu_slider(ctx, &light.specular.x, 0.0f, 1.0f);
+      mu_slider(ctx, &light.specular.y, 0.0f, 1.0f);
+      mu_slider(ctx, &light.specular.z, 0.0f, 1.0f);
+
+      mu_layout_row(ctx, 1, wl, 0);
+      mu_label(ctx, "Shininess:");
+      mu_slider(ctx, &material.shininess, 1.0f, 128.0f);
 
       mu_end_window(ctx);
     }
