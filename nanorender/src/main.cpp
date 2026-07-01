@@ -545,6 +545,42 @@ int main()
       draw_line((int)v2.x, (int)v2.y, (int)v0.x, (int)v0.y, MFB_RGB(255, 255, 255));
     }
 
+    // hw5 part 3: draw light and reflection debug vectors
+    if (show_face_normals)
+    { // reuse face normals toggle for debug vectors
+      for (const auto &face : mesh_faces)
+      {
+        Vec3 v0 = mesh_verts[face.v0];
+        Vec3 v1 = mesh_verts[face.v1];
+        Vec3 v2 = mesh_verts[face.v2];
+        Vec3 fn = compute_face_normal(v0, v1, v2);
+        glm::vec3 normal(fn.x, fn.y, fn.z);
+
+        // face center
+        glm::vec3 fc(
+            (v0.x + v1.x + v2.x) / 3.0f,
+            (v0.y + v1.y + v2.y) / 3.0f,
+            (v0.z + v1.z + v2.z) / 3.0f);
+
+        glm::vec3 light_dir = glm::normalize(light.position - fc);
+        glm::vec3 reflect_dir = glm::reflect(-light_dir, normal);
+
+        float vlen = 0.3f;
+
+        // light vector - yellow
+        Vec3 fc3 = {fc.x, fc.y, fc.z};
+        Vec3 light_tip = {fc.x + light_dir.x * vlen, fc.y + light_dir.y * vlen, fc.z + light_dir.z * vlen};
+        Vec3 pfc = apply_transforms(fc3);
+        Vec3 plt = apply_transforms(light_tip);
+        draw_line((int)pfc.x, (int)pfc.y, (int)plt.x, (int)plt.y, MFB_RGB(255, 255, 0));
+
+        // reflection vector - magenta
+        Vec3 reflect_tip = {fc.x + reflect_dir.x * vlen, fc.y + reflect_dir.y * vlen, fc.z + reflect_dir.z * vlen};
+        Vec3 prt = apply_transforms(reflect_tip);
+        draw_line((int)pfc.x, (int)pfc.y, (int)prt.x, (int)prt.y, MFB_RGB(255, 0, 255));
+      }
+    }
+
     // hw4 part 1: bounding box rasterization debug
     if (show_raster_bbox)
     {
@@ -662,15 +698,26 @@ int main()
         // lambert's cosine law: diffuse = max(0, dot(normal, light_dir))
         float diff = glm::max(glm::dot(normal, light_dir), 0.0f);
 
-        // ambient + diffuse
+        // view direction from face center to camera
+        glm::vec3 view_dir = glm::normalize(-fc); // camera at origin in view space
+
+        // reflection vector
+        glm::vec3 reflect_dir = glm::reflect(-light_dir, normal);
+
+        // specular: pow(max(dot(view, reflect), 0), shininess)
+        float spec = powf(glm::max(glm::dot(view_dir, reflect_dir), 0.0f), material.shininess);
+
+        // ambient + diffuse + specular
         glm::vec3 ambient = light.ambient * material.ambient;
         glm::vec3 diffuse = light.diffuse * material.diffuse * diff;
-        glm::vec3 color_v = glm::clamp(ambient + diffuse, 0.0f, 1.0f);
+        glm::vec3 specular = light.specular * material.specular * spec;
+        glm::vec3 color_v = glm::clamp(ambient + diffuse + specular, 0.0f, 1.0f);
 
         uint32_t color = MFB_RGB(
             (uint8_t)(color_v.x * 255),
             (uint8_t)(color_v.y * 255),
             (uint8_t)(color_v.z * 255));
+
         for (int y = min_y; y <= max_y; y++)
         {
           for (int x = min_x; x <= max_x; x++)
