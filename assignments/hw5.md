@@ -82,3 +82,76 @@ Render the result. Your jagged, low-poly model should now look incredibly smooth
 * **Background:** Instead of assigning a solid color material to an object, we can wrap a 2D image (texture) around it. This requires reading $U, V$ texture coordinates assigned to each vertex.
 
 * **Task:** Extend your `.obj` loader to read `vt` (texture coordinate) data. Load a simple `.bmp` or `.png` file into a 1D pixel array in memory. During rasterization, use your barycentric coordinates to interpolate the $U, V$ values at the current pixel. Use these $U, V$ values to look up the exact color from the texture array and apply it to the Diffuse component of your lighting equation.
+
+---
+
+# My Report
+
+**Student:** Mohammad Abu Saleh  
+**ID:** 206380487
+
+---
+
+## Part 1: Light Sources and Material Properties
+
+### Approach
+Created two structs: `PointLight` (position, ambient, diffuse, specular as `glm::vec3`) and `Material` (ambient, diffuse, specular, shininess). Added default instances as globals with an orange-ish material and a white light.
+
+Added a Lighting UI panel with sliders for light position, ambient/diffuse/specular RGB values, and shininess.
+
+Implemented ambient lighting by multiplying `light.ambient * material.ambient` once per triangle and applying that constant color to every pixel in the triangle. The result is a flat, uniformly lit object that responds to the ambient color sliders.
+
+### Result
+![Part 1 - Ambient lighting](../nanorender/assets/fillTriangles.png)
+
+---
+
+## Part 2: Flat Shading (Diffuse Lighting)
+
+### Approach
+Added diffuse lighting using Lambert's Cosine Law. For each triangle:
+1. Computed the face normal using `compute_face_normal`
+2. Computed the face center in model space
+3. Computed the light direction: `normalize(light.position - face_center)`
+4. Calculated diffuse intensity: `max(0, dot(normal, light_dir))`
+5. Combined: `ambient + diffuse * diff`
+
+This is calculated once per triangle so every pixel on the same triangle gets the same color — the "flat shading" faceted look. Each square face of the cube shows as one distinct shade depending on its angle to the light, giving a jewel-like appearance.
+
+### Result
+![Part 2 - Flat shading](../nanorender/assets/Triangles.png)
+
+---
+
+## Part 3: Specular Highlights
+
+### Approach
+Added the specular component to complete the Phong lighting equation:
+1. View direction: `normalize(-face_center)` (camera at origin in view space)
+2. Reflection vector: `reflect(-light_dir, normal)`
+3. Specular intensity: `pow(max(dot(view_dir, reflect_dir), 0), shininess)`
+4. Final color: `ambient + diffuse + specular`
+
+Also added debug visualization reusing the "Show Face Normals" toggle:
+- **Orange lines** — light direction vectors from each face center toward the light source
+- **Cyan lines** — reflection vectors showing where the light bounces off the surface
+
+### Result
+![Part 3 - Specular highlights with debug vectors](../nanorender/assets/lightAndNormals.png)
+
+---
+
+## Part 4: Phong Shading (Per-Pixel Shading)
+
+### Approach
+Modified the rasterization loop to calculate full lighting at every single pixel instead of once per face:
+
+1. **Precomputed vertex normals** by accumulating all face normals that share each vertex, then normalizing
+2. **Per-pixel normal interpolation** using barycentric weights: `normalize(alpha*n0 + beta*n1 + gamma*n2)`
+3. **Per-pixel position interpolation** using the same barycentric weights
+4. **Full Phong lighting** (ambient + diffuse + specular) calculated at every pixel using the interpolated normal and position
+
+The result is smooth gradients across faces with realistic specular highlights — the cube appears to have a smooth rounded surface even though the underlying mesh is still blocky. This is the classic Phong shading illusion.
+
+### Result
+![Part 4 - Phong shading](../nanorender/assets/lightByPixel.png)
