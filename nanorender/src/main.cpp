@@ -23,8 +23,6 @@ extern "C"
 #define WIDTH 1280
 #define HEIGHT 800
 
-
-
 // hw5 part 1: light and material structs
 struct PointLight
 {
@@ -109,7 +107,6 @@ static int draw_start_y = 0;
 float color_r = 255.0f;
 float color_g = 255.0f;
 float color_b = 255.0f;
-
 
 // bresenham's line algorithm
 // handles all slopes using switch and reflect approach
@@ -648,14 +645,32 @@ int main()
         max_y = std::min(max_y, HEIGHT - 1);
 
         face_idx++;
-        // hw5 part 1: ambient lighting
-        glm::vec3 ambient = light.ambient * material.ambient;
-        ambient = glm::clamp(ambient, 0.0f, 1.0f);
-        uint32_t color = MFB_RGB(
-            (uint8_t)(ambient.r * 255),
-            (uint8_t)(ambient.g * 255),
-            (uint8_t)(ambient.b * 255));
+        // hw5 part 2: flat shading - compute lighting once per face
+        // get face normal in model space
+        Vec3 fn = compute_face_normal(mesh_verts[face.v0], mesh_verts[face.v1], mesh_verts[face.v2]);
+        glm::vec3 normal(fn.x, fn.y, fn.z);
 
+        // face center in model space
+        glm::vec3 fc(
+            (mesh_verts[face.v0].x + mesh_verts[face.v1].x + mesh_verts[face.v2].x) / 3.0f,
+            (mesh_verts[face.v0].y + mesh_verts[face.v1].y + mesh_verts[face.v2].y) / 3.0f,
+            (mesh_verts[face.v0].z + mesh_verts[face.v1].z + mesh_verts[face.v2].z) / 3.0f);
+
+        // light direction from face center to light
+        glm::vec3 light_dir = glm::normalize(light.position - fc);
+
+        // lambert's cosine law: diffuse = max(0, dot(normal, light_dir))
+        float diff = glm::max(glm::dot(normal, light_dir), 0.0f);
+
+        // ambient + diffuse
+        glm::vec3 ambient = light.ambient * material.ambient;
+        glm::vec3 diffuse = light.diffuse * material.diffuse * diff;
+        glm::vec3 color_v = glm::clamp(ambient + diffuse, 0.0f, 1.0f);
+
+        uint32_t color = MFB_RGB(
+            (uint8_t)(color_v.x * 255),
+            (uint8_t)(color_v.y * 255),
+            (uint8_t)(color_v.z * 255));
         for (int y = min_y; y <= max_y; y++)
         {
           for (int x = min_x; x <= max_x; x++)
