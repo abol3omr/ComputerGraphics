@@ -659,6 +659,19 @@ int main()
     // }
 
     // hw4 part 2+3: fill triangles with barycentric coordinates and z-buffer
+    // hw5 part 4: precompute vertex normals for phong shading
+    std::vector<glm::vec3> vert_normals_phong(mesh_verts.size(), glm::vec3(0.0f));
+    for (const auto &face : mesh_faces)
+    {
+      Vec3 fn = compute_face_normal(mesh_verts[face.v0], mesh_verts[face.v1], mesh_verts[face.v2]);
+      glm::vec3 n(fn.x, fn.y, fn.z);
+      vert_normals_phong[face.v0] += n;
+      vert_normals_phong[face.v1] += n;
+      vert_normals_phong[face.v2] += n;
+    }
+    for (auto &n : vert_normals_phong)
+      n = glm::normalize(n);
+
     if (fill_triangles)
     {
       int face_idx = 0;
@@ -731,15 +744,42 @@ int main()
 
             if (alpha >= 0 && beta >= 0 && gamma >= 0)
             {
-              // interpolate depth using barycentric weights
               float depth = alpha * v0.z + beta * v1.z + gamma * v2.z;
 
-              // depth test
               int idx = y * WIDTH + x;
               if (depth < z_buffer[idx])
               {
                 z_buffer[idx] = depth;
-                g_buffer[idx] = color;
+
+                // hw5 part 4: phong shading - interpolate normal per pixel
+                glm::vec3 pn = glm::normalize(
+                    alpha * vert_normals_phong[face.v0] +
+                    beta * vert_normals_phong[face.v1] +
+                    gamma * vert_normals_phong[face.v2]);
+
+                // interpolate 3D position
+                glm::vec3 pp(
+                    alpha * mesh_verts[face.v0].x + beta * mesh_verts[face.v1].x + gamma * mesh_verts[face.v2].x,
+                    alpha * mesh_verts[face.v0].y + beta * mesh_verts[face.v1].y + gamma * mesh_verts[face.v2].y,
+                    alpha * mesh_verts[face.v0].z + beta * mesh_verts[face.v1].z + gamma * mesh_verts[face.v2].z);
+
+                // per-pixel lighting
+                glm::vec3 light_dir = glm::normalize(light.position - pp);
+                float diff = glm::max(glm::dot(pn, light_dir), 0.0f);
+
+                glm::vec3 view_dir = glm::normalize(-pp);
+                glm::vec3 reflect_dir = glm::reflect(-light_dir, pn);
+                float spec = powf(glm::max(glm::dot(view_dir, reflect_dir), 0.0f), material.shininess);
+
+                glm::vec3 ambient = light.ambient * material.ambient;
+                glm::vec3 diffuse = light.diffuse * material.diffuse * diff;
+                glm::vec3 specular = light.specular * material.specular * spec;
+                glm::vec3 pixel_color = glm::clamp(ambient + diffuse + specular, 0.0f, 1.0f);
+
+                g_buffer[idx] = MFB_RGB(
+                    (uint8_t)(pixel_color.x * 255),
+                    (uint8_t)(pixel_color.y * 255),
+                    (uint8_t)(pixel_color.z * 255));
               }
             }
           }
