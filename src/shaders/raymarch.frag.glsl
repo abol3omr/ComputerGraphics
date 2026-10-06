@@ -60,13 +60,16 @@ void main() {
   // Pixel -> point on the image plane, with (0,0) in the centre and y in [-1, 1].
   vec2 uv = (2.0 * gl_FragCoord.xy - uResolution) / uResolution.y;
 
-  vec3 eye = vec3(1.45, 1.42, 1.50);
+  // Overview: step back further for a longer countertop so it stays in the picture.
   vec3 target = vec3(0.0, 0.80, -0.50);
+  vec3 eye = target + vec3(1.45, 0.62, 2.00) * max(1.0, 0.25 + 0.75 * uLength / 2.2);
   float focalLength = 1.9;
   if (uView == 1) {
-    // Close to the front right corner, where the edge profile is seen in cross-section.
-    eye = vec3(1.46, 0.95, -0.02);
-    target = vec3(1.05, 0.87, -0.30);
+    // Close to the front right corner of the slab, where the edge profile is seen in
+    // cross-section. The camera follows the corner when the size changes.
+    vec3 corner = vec3(uLength / 2.0, CABINET_HEIGHT + uThickness, WALL_Z + uDepth);
+    eye = corner + vec3(0.33, 0.05, 0.25);
+    target = corner + vec3(-0.08, -0.03, -0.03);
     focalLength = 2.3;
   }
   vec3 rayDirection = cameraRay(uv, eye, target, focalLength);

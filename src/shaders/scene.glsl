@@ -6,11 +6,13 @@ const float MATERIAL_CABINET = 2.0;
 const float MATERIAL_STONE = 3.0;
 const float MATERIAL_VASE = 4.0;
 
+// The size of the countertop is chosen by the user.
+uniform float uLength;    // along the wall
+uniform float uDepth;     // from the wall to the front edge
+uniform float uThickness; // of the slab
+
 const float WALL_Z = -0.90;         // the wall is the plane z = WALL_Z
 const float CABINET_HEIGHT = 0.86;
-const float CABINET_HALF_WIDTH = 1.10;
-const float CABINET_DEPTH = 0.60;
-const float SLAB_THICKNESS = 0.04;  // a 4 cm countertop
 const float SLAB_OVERHANG = 0.03;   // the slab sticks out 3 cm past the cabinet
 
 uniform int uEdge; // 0 square, 1 bevelled, 2 rounded, 3 bullnose
@@ -28,16 +30,16 @@ const float ROUNDED_RADIUS = 0.010; // a 10 mm rounded edge
 //   bullnose - corner radius = half the thickness, so the front becomes a half circle
 //   bevelled - a square profile with the top front corner cut off by a 45 degree plane
 float sdSlab(vec3 p) {
-  float halfThickness = SLAB_THICKNESS / 2.0;
-  float halfWidth = CABINET_HALF_WIDTH + SLAB_OVERHANG;
-  float frontZ = WALL_Z + CABINET_DEPTH + SLAB_OVERHANG;
+  float halfThickness = uThickness / 2.0;
+  float halfLength = uLength / 2.0;
+  float frontZ = WALL_Z + uDepth;
 
   // Profile coordinates: y measured from the middle of the slab, z from its front face.
   float y = p.y - (CABINET_HEIGHT + halfThickness);
   float z = p.z - frontZ;
 
   float radius = 0.0;
-  if (uEdge == 2) radius = ROUNDED_RADIUS;
+  if (uEdge == 2) radius = min(ROUNDED_RADIUS, halfThickness);
   if (uEdge == 3) radius = halfThickness;
 
   // 2D rounded rectangle: shrink the rectangle by the radius, then grow it back by the
@@ -53,7 +55,7 @@ float sdSlab(vec3 p) {
   }
 
   // Extrude along x: intersect with the slab's width and with the wall behind it.
-  return max(profile, max(abs(p.x) - halfWidth, WALL_Z - p.z));
+  return max(profile, max(abs(p.x) - halfLength, WALL_Z - p.z));
 }
 
 // Keep whichever of the two (distance, material) pairs is closer.
@@ -67,25 +69,28 @@ vec2 map(vec3 p) {
   vec2 result = vec2(p.y, MATERIAL_FLOOR);
   result = closer(result, vec2(p.z - WALL_Z, MATERIAL_WALL));
 
-  // Cabinet: a box standing on the floor with its back against the wall.
-  vec3 cabinetCentre = vec3(0.0, CABINET_HEIGHT / 2.0, WALL_Z + CABINET_DEPTH / 2.0);
-  vec3 cabinetHalfSize = vec3(CABINET_HALF_WIDTH, CABINET_HEIGHT / 2.0, CABINET_DEPTH / 2.0);
+  // Cabinet: a box standing on the floor with its back against the wall. It follows the
+  // size of the countertop, which overhangs it at the front and at both ends.
+  float cabinetDepth = uDepth - SLAB_OVERHANG;
+  vec3 cabinetCentre = vec3(0.0, CABINET_HEIGHT / 2.0, WALL_Z + cabinetDepth / 2.0);
+  vec3 cabinetHalfSize = vec3(uLength / 2.0 - SLAB_OVERHANG, CABINET_HEIGHT / 2.0, cabinetDepth / 2.0);
   result = closer(result, vec2(sdBox(p - cabinetCentre, cabinetHalfSize), MATERIAL_CABINET));
 
-  // Countertop: a slab on top of the cabinet, overhanging the front and the sides,
-  // with the edge profile chosen by the user.
+  // Countertop: a slab on top of the cabinet, with the size and the edge profile
+  // chosen by the user.
   float stone = sdSlab(p);
 
   // Backsplash: a strip of the same stone on the wall behind the countertop.
-  vec3 splashCentre = vec3(0.0, CABINET_HEIGHT + SLAB_THICKNESS + 0.28, WALL_Z + 0.01);
-  stone = min(stone, sdBox(p - splashCentre, vec3(CABINET_HALF_WIDTH + SLAB_OVERHANG, 0.28, 0.01)));
+  vec3 splashCentre = vec3(0.0, CABINET_HEIGHT + uThickness + 0.28, WALL_Z + 0.01);
+  stone = min(stone, sdBox(p - splashCentre, vec3(uLength / 2.0, 0.28, 0.01)));
   result = closer(result, vec2(stone, MATERIAL_STONE));
 
   // Vase: two spheres blended with a smooth minimum. It gives a sense of scale now,
   // and later something for the polished stone to reflect.
-  float top = CABINET_HEIGHT + SLAB_THICKNESS;
-  float body = sdSphere(p - vec3(-0.60, top + 0.12, -0.62), 0.12);
-  float neck = sdSphere(p - vec3(-0.60, top + 0.28, -0.62), 0.045);
+  float top = CABINET_HEIGHT + uThickness;
+  vec3 vaseBase = vec3(-0.27 * uLength, top, WALL_Z + 0.28);
+  float body = sdSphere(p - vaseBase - vec3(0.0, 0.12, 0.0), 0.12);
+  float neck = sdSphere(p - vaseBase - vec3(0.0, 0.28, 0.0), 0.045);
   result = closer(result, vec2(smoothMin(body, neck, 0.09), MATERIAL_VASE));
 
   return result;

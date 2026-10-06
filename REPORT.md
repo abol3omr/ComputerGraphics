@@ -93,3 +93,30 @@ polygons to look smooth.
 
 **Limitation:** only the front edge is profiled. The two side ends of the slab stay square, and the
 round profiles are rounded on the bottom as well as the top.
+
+## Part 4: Adjustable Countertop Size
+
+### Approach
+
+- Every kitchen is a different size, so the length, depth and thickness of the countertop are now
+  sliders (in centimetres) instead of constants.
+- In the shader the three constants became uniforms: `uLength`, `uDepth`, `uThickness`. Everything
+  else is derived from them inside `map`: the cabinet is the slab minus the overhang, the backsplash
+  has the slab's length, and the vase stays at the same relative position on the top.
+- The edge profile adapts by itself. The bullnose radius is defined as half the thickness, so a
+  thicker slab automatically gets a bigger half circle, and the rounded edge is clamped so its radius
+  can never be larger than half the thickness.
+- Both cameras follow the size: the overview steps back for a longer countertop, and the close-up is
+  defined relative to the front corner of the slab, so it stays on the edge.
+- Resizing does not rebuild anything. There is no vertex buffer to regenerate, only three numbers
+  that the distance function reads, so the change is immediate.
+
+### Result
+
+The same scene at two sizes. The proportions of the cabinet, backsplash and edge all follow the three
+sliders.
+
+![A small 120 x 55 cm countertop next to a large 320 x 85 cm one](./assets/part4_sizes.png)
+
+This matters for the stone texture added later: because the texture will be computed from the 3D
+position of each point, a longer countertop will show *more* stone, not a stretched picture of it.
