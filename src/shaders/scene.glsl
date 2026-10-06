@@ -81,8 +81,10 @@ vec2 map(vec3 p) {
   float stone = sdSlab(p);
 
   // Backsplash: a strip of the same stone on the wall behind the countertop.
-  vec3 splashCentre = vec3(0.0, CABINET_HEIGHT + uThickness + 0.28, WALL_Z + 0.01);
-  stone = min(stone, sdBox(p - splashCentre, vec3(uLength / 2.0, 0.28, 0.01)));
+  // It is cut from the same slab, so it has the same thickness. Its edges stay square
+  // whatever edge profile is chosen for the countertop.
+  vec3 splashCentre = vec3(0.0, CABINET_HEIGHT + uThickness + 0.28, WALL_Z + uThickness / 2.0);
+  stone = min(stone, sdBox(p - splashCentre, vec3(uLength / 2.0, 0.28, uThickness / 2.0)));
   result = closer(result, vec2(stone, MATERIAL_STONE));
 
   // Vase: two spheres blended with a smooth minimum. It gives a sense of scale now,

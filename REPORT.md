@@ -102,7 +102,7 @@ round profiles are rounded on the bottom as well as the top.
   sliders (in centimetres) instead of constants.
 - In the shader the three constants became uniforms: `uLength`, `uDepth`, `uThickness`. Everything
   else is derived from them inside `map`: the cabinet is the slab minus the overhang, the backsplash
-  has the slab's length, and the vase stays at the same relative position on the top.
+  has the slab's length and thickness (its own edges stay square), and the vase stays at the same relative position on the top.
 - The edge profile adapts by itself. The bullnose radius is defined as half the thickness, so a
   thicker slab automatically gets a bigger half circle, and the rounded edge is clamped so its radius
   can never be larger than half the thickness.
@@ -120,3 +120,36 @@ sliders.
 
 This matters for the stone texture added later: because the texture will be computed from the 3D
 position of each point, a longer countertop will show *more* stone, not a stretched picture of it.
+
+## Part 5: Lighting, Soft Shadows and Ambient Occlusion
+
+### Approach
+
+- I replaced the temporary shading with the **Phong reflection model** from the lecture, using the
+  same notation: `I = Ia + Id + Is`, with `Ia = La * ka`, `Id = kd * (l . n) * Ld` and
+  `Is = ks * (r . v)^alpha * Ls`. There is one parallel light source, like sun through a window.
+- Each material now has its own `k`, `ks` and `alpha` (a `Material` struct in `materials.glsl`), so the
+  stone and the vase get a highlight while the wall stays matte.
+- Because the normal comes from the distance function at every pixel, this is automatically per-pixel
+  (Phong) shading. There are no vertices to interpolate between, so there is no flat / Gouraud / Phong
+  choice to make as there was in the homework.
+- **Soft shadows.** The homework engine had no shadows, because a rasterizer only knows about the
+  triangle it is drawing. Here I march a second ray from the surface point towards the light. If it
+  hits something, the point is in shadow. If it only passes *close* to something, the point is in the
+  penumbra, and I darken it by how close the miss was (`sharpness * h / t`). This gives a soft edge
+  that gets wider further from the object, at no extra cost over a hard shadow.
+- **Ambient occlusion.** I sample the distance function at five short steps along the normal. In open
+  space the distance there equals the step length. If it is smaller, another surface is nearby and
+  blocks part of the ambient light, so I reduce the ambient term. This darkens the corners where the
+  cabinet meets the floor and the wall.
+- The shadow multiplies only the diffuse and specular terms (direct light), and the occlusion only the
+  ambient term (light from everywhere). Both can be switched off in the control panel to compare.
+- The final color is clamped ("beware of overflows") and gamma-corrected.
+
+### Result
+
+The same view with the two effects switched on and off. With the reflection model alone, the cabinet
+looks like it floats in front of the wall. The shadow places it in the room and shows where the light
+comes from, and the ambient occlusion grounds it where it meets the floor and the wall.
+
+![Phong reflection only, with soft shadows, with ambient occlusion, and with both](./assets/part5_lighting.png)
