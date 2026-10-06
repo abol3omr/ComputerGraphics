@@ -3,6 +3,7 @@
 // A signed distance function (SDF) returns, for any point p in space, the distance
 // from p to the nearest surface: positive outside, negative inside, zero on the surface.
 // The scene is not a list of triangles - it is one function, map(p), defined in scene.glsl.
+// Lighting is in lighting.glsl and the surface properties are in materials.glsl.
 
 uniform vec2 uResolution;
 uniform int uView; // 0 overview, 1 close-up of the countertop edge
@@ -38,15 +39,6 @@ vec3 calcNormal(vec3 p) {
   ));
 }
 
-// A plain color per material. Textures and real lighting come in later parts.
-vec3 materialColor(float material) {
-  if (material == MATERIAL_FLOOR) return vec3(0.50, 0.38, 0.27);
-  if (material == MATERIAL_WALL) return vec3(0.88, 0.86, 0.82);
-  if (material == MATERIAL_CABINET) return vec3(0.20, 0.27, 0.33);
-  if (material == MATERIAL_STONE) return vec3(0.80, 0.80, 0.78);
-  return vec3(0.72, 0.38, 0.26); // vase
-}
-
 // Camera: build the ray through this pixel for a camera at `eye` looking at `target`.
 // forward/right/up are the camera's coordinate frame, like the view matrix in the homework.
 vec3 cameraRay(vec2 uv, vec3 eye, vec3 target, float focalLength) {
@@ -74,17 +66,18 @@ void main() {
   }
   vec3 rayDirection = cameraRay(uv, eye, target, focalLength);
 
-  vec3 color = vec3(0.60, 0.68, 0.78); // sky, only visible if a ray hits nothing
+  vec3 color = vec3(0.35, 0.45, 0.60); // sky, only visible if a ray hits nothing
 
   vec2 hit = march(eye, rayDirection);
   if (hit.x > 0.0) {
-    vec3 normal = calcNormal(eye + rayDirection * hit.x);
-    // Temporary shading so the shapes can be told apart: a fixed light direction
-    // and a constant ambient term. Part 4 replaces this with the real lighting.
-    vec3 lightDirection = normalize(vec3(0.35, 0.90, 0.50));
-    float diffuse = max(dot(normal, lightDirection), 0.0);
-    color = materialColor(hit.y) * (0.35 + 0.65 * diffuse);
+    vec3 p = eye + rayDirection * hit.x;
+    vec3 n = calcNormal(p);
+    vec3 v = -rayDirection; // direction from the surface point to the eye
+    color = phongReflection(p, n, v, getMaterial(hit.y, p));
   }
 
+  // "Beware of overflows": clamp, then gamma-correct, because the lighting is computed
+  // in linear light but the screen expects gamma-encoded values.
+  color = pow(clamp(color, 0.0, 1.0), vec3(1.0 / 2.2));
   fragColor = vec4(color, 1.0);
 }

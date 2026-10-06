@@ -3,10 +3,13 @@ import { createProgram, resizeToDisplay } from "./gl";
 import vertexSource from "./shaders/fullscreen.vert.glsl?raw";
 import sdf from "./shaders/sdf.glsl?raw";
 import scene from "./shaders/scene.glsl?raw";
+import materials from "./shaders/materials.glsl?raw";
+import lighting from "./shaders/lighting.glsl?raw";
 import raymarch from "./shaders/raymarch.frag.glsl?raw";
 
-// The fragment shader is assembled from three files: shapes, the scene, and the ray marcher.
-const fragmentSource = sdf + scene + raymarch;
+// The fragment shader is assembled from several files, in dependency order:
+// shapes, the scene, materials, lighting, and finally the ray marcher with main().
+const fragmentSource = sdf + scene + materials + lighting + raymarch;
 
 const canvas = document.querySelector<HTMLCanvasElement>("#view")!;
 const gl = canvas.getContext("webgl2");
@@ -20,6 +23,8 @@ const uView = uniform("uView");
 const uLength = uniform("uLength");
 const uDepth = uniform("uDepth");
 const uThickness = uniform("uThickness");
+const uShadows = uniform("uShadows");
+const uAmbientOcclusion = uniform("uAmbientOcclusion");
 
 // --- settings: everything the customer can choose ---------------------------
 const EDGES = ["Square", "Bevelled", "Rounded", "Bullnose"] as const;
@@ -31,6 +36,8 @@ const settings = {
   length: 220, // cm, along the wall
   depth: 63, // cm, from the wall to the front edge
   thickness: 4, // cm
+  shadows: true,
+  ambientOcclusion: true,
 };
 
 // Settings can also be given in the address bar, e.g. ?edge=Bullnose&length=300&thickness=2
@@ -44,6 +51,9 @@ for (const key of ["length", "depth", "thickness"] as const) {
   const value = Number(query.get(key));
   if (query.has(key) && Number.isFinite(value)) settings[key] = value;
 }
+for (const key of ["shadows", "ambientOcclusion"] as const) {
+  if (query.has(key)) settings[key] = query.get(key) !== "0";
+}
 
 function draw(): void {
   resizeToDisplay(canvas);
@@ -56,6 +66,8 @@ function draw(): void {
   gl!.uniform1f(uLength, settings.length / 100);
   gl!.uniform1f(uDepth, settings.depth / 100);
   gl!.uniform1f(uThickness, settings.thickness / 100);
+  gl!.uniform1f(uShadows, settings.shadows ? 1 : 0);
+  gl!.uniform1f(uAmbientOcclusion, settings.ambientOcclusion ? 1 : 0);
   gl!.drawArrays(gl!.TRIANGLES, 0, 3); // the full-screen triangle
 }
 
@@ -68,6 +80,10 @@ const size = gui.addFolder("Countertop size (cm)");
 size.add(settings, "length", 100, 320, 5).onChange(draw);
 size.add(settings, "depth", 50, 90, 1).onChange(draw);
 size.add(settings, "thickness", 2, 6, 0.5).onChange(draw);
+
+const light = gui.addFolder("Lighting");
+light.add(settings, "shadows").name("soft shadows").onChange(draw);
+light.add(settings, "ambientOcclusion").name("ambient occlusion").onChange(draw);
 if (query.get("ui") === "0") gui.hide();
 
 window.addEventListener("resize", draw);
