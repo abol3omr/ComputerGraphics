@@ -3,13 +3,14 @@ import { createProgram, resizeToDisplay } from "./gl";
 import vertexSource from "./shaders/fullscreen.vert.glsl?raw";
 import sdf from "./shaders/sdf.glsl?raw";
 import scene from "./shaders/scene.glsl?raw";
+import noise from "./shaders/noise.glsl?raw";
 import materials from "./shaders/materials.glsl?raw";
 import lighting from "./shaders/lighting.glsl?raw";
 import raymarch from "./shaders/raymarch.frag.glsl?raw";
 
 // The fragment shader is assembled from several files, in dependency order:
-// shapes, the scene, materials, lighting, and finally the ray marcher with main().
-const fragmentSource = sdf + scene + materials + lighting + raymarch;
+// shapes, the scene, noise, materials, lighting, and finally the ray marcher with main().
+const fragmentSource = sdf + scene + noise + materials + lighting + raymarch;
 
 const canvas = document.querySelector<HTMLCanvasElement>("#view")!;
 const gl = canvas.getContext("webgl2");
@@ -23,14 +24,19 @@ const uView = uniform("uView");
 const uLength = uniform("uLength");
 const uDepth = uniform("uDepth");
 const uThickness = uniform("uThickness");
+const uStone = uniform("uStone");
+const uSlab = uniform("uSlab");
 const uShadows = uniform("uShadows");
 const uAmbientOcclusion = uniform("uAmbientOcclusion");
 
 // --- settings: everything the customer can choose ---------------------------
 const EDGES = ["Square", "Bevelled", "Rounded", "Bullnose"] as const;
 const VIEWS = ["Overview", "Edge close-up"] as const;
+const STONES = ["White marble", "Black marble", "Green marble", "Travertine"] as const;
 
 const settings = {
+  stone: "White marble" as (typeof STONES)[number],
+  slab: 0, // which part of the stone the slab is cut from
   edge: "Rounded" as (typeof EDGES)[number],
   view: "Overview" as (typeof VIEWS)[number],
   length: 220, // cm, along the wall
@@ -47,7 +53,9 @@ const queryEdge = query.get("edge") as (typeof EDGES)[number] | null;
 const queryView = query.get("view") as (typeof VIEWS)[number] | null;
 if (queryEdge && EDGES.includes(queryEdge)) settings.edge = queryEdge;
 if (queryView && VIEWS.includes(queryView)) settings.view = queryView;
-for (const key of ["length", "depth", "thickness"] as const) {
+const queryStone = query.get("stone") as (typeof STONES)[number] | null;
+if (queryStone && STONES.includes(queryStone)) settings.stone = queryStone;
+for (const key of ["length", "depth", "thickness", "slab"] as const) {
   const value = Number(query.get(key));
   if (query.has(key) && Number.isFinite(value)) settings[key] = value;
 }
@@ -66,6 +74,8 @@ function draw(): void {
   gl!.uniform1f(uLength, settings.length / 100);
   gl!.uniform1f(uDepth, settings.depth / 100);
   gl!.uniform1f(uThickness, settings.thickness / 100);
+  gl!.uniform1i(uStone, STONES.indexOf(settings.stone));
+  gl!.uniform1f(uSlab, settings.slab);
   gl!.uniform1f(uShadows, settings.shadows ? 1 : 0);
   gl!.uniform1f(uAmbientOcclusion, settings.ambientOcclusion ? 1 : 0);
   gl!.drawArrays(gl!.TRIANGLES, 0, 3); // the full-screen triangle
@@ -73,6 +83,8 @@ function draw(): void {
 
 // --- control panel -----------------------------------------------------------
 const gui = new GUI({ title: "Stone Previewer" });
+gui.add(settings, "stone", [...STONES]).onChange(draw);
+gui.add(settings, "slab", 0, 20, 1).name("slab number").onChange(draw);
 gui.add(settings, "edge", [...EDGES]).name("edge profile").onChange(draw);
 gui.add(settings, "view", [...VIEWS]).onChange(draw);
 

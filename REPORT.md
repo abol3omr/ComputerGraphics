@@ -153,3 +153,43 @@ looks like it floats in front of the wall. The shadow places it in the room and 
 comes from, and the ambient occlusion grounds it where it meets the floor and the wall.
 
 ![Phong reflection only, with soft shadows, with ambient occlusion, and with both](./assets/part5_lighting.png)
+
+## Part 6: Procedural Stone
+
+### Approach
+
+- The stone is a **procedural texture** built from the functions in the Procedural Textures lecture,
+  keeping the names from the slides: `Noise`, `FBm`, `turbulence`, `marble` and `marble_color`.
+- `Noise` is classic 3D Perlin (gradient) noise: a pseudo-random gradient at every grid point, taken
+  from a hash function instead of a stored table, and Hermite interpolation between the 8 nearest
+  grid points.
+- `FBm` sums several octaves of the noise, each with double the frequency and half the amplitude.
+  `turbulence` is the same sum but of the absolute value of the noise, which creates sharp creases.
+- The marble follows the lecture: `x = p.x + turbulence(p)` and `color = marble_color(sin(x))`.
+  `sin` alone gives straight parallel stripes, and the turbulence bends them into veins. I changed two
+  things: the stripes run along a diagonal direction so the veins cross the countertop at an angle,
+  and the palette uses a narrow `smoothstep`, so most of the surface is the base color with thin veins.
+- There are four stones (white, black and green marble, and travertine). Each is only five numbers:
+  vein color, base color, vein frequency, turbulence amount and vein width. Travertine uses a high
+  frequency with little turbulence, which gives its straight bands.
+- A **slab number** slider shifts the point before it is textured, which is like cutting the slab
+  from a different place in the quarry: the same stone, with a different vein pattern.
+- The texture is evaluated on the 3D position of the surface point, in metres. There are no UV
+  coordinates and no image.
+
+### Result
+
+![The four stones: white marble, black marble, green marble and travertine](./assets/part6_stones.png)
+
+Two things follow from the texture being a function of the 3D point:
+
+- **It cannot stretch.** Below is the same white marble on a 120 cm and a 320 cm countertop. The veins
+  keep their size, and the longer piece simply shows more of the stone. An image texture mapped onto
+  a mesh would have to be stretched or tiled.
+- **It is continuous across pieces.** The veins run from the countertop up into the backsplash without
+  a seam, as if both were carved from one block.
+
+![The same marble at two countertop lengths: the veins do not stretch](./assets/part6_no_stretch.png)
+
+**Limitation:** this is a generic stone *type*, not a photograph of a specific slab, and real veins
+are less regular than the ones this function produces.
