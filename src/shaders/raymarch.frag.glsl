@@ -5,6 +5,7 @@
 // The scene is not a list of triangles - it is one function, map(p), defined in scene.glsl.
 
 uniform vec2 uResolution;
+uniform int uView; // 0 overview, 1 close-up of the countertop edge
 
 out vec4 fragColor;
 
@@ -61,7 +62,14 @@ void main() {
 
   vec3 eye = vec3(1.45, 1.42, 1.50);
   vec3 target = vec3(0.0, 0.80, -0.50);
-  vec3 rayDirection = cameraRay(uv, eye, target, 1.9);
+  float focalLength = 1.9;
+  if (uView == 1) {
+    // Close to the front right corner, where the edge profile is seen in cross-section.
+    eye = vec3(1.46, 0.95, -0.02);
+    target = vec3(1.05, 0.87, -0.30);
+    focalLength = 2.3;
+  }
+  vec3 rayDirection = cameraRay(uv, eye, target, focalLength);
 
   vec3 color = vec3(0.60, 0.68, 0.78); // sky, only visible if a ray hits nothing
 

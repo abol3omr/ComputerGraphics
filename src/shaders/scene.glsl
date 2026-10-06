@@ -13,6 +13,49 @@ const float CABINET_DEPTH = 0.60;
 const float SLAB_THICKNESS = 0.04;  // a 4 cm countertop
 const float SLAB_OVERHANG = 0.03;   // the slab sticks out 3 cm past the cabinet
 
+uniform int uEdge; // 0 square, 1 bevelled, 2 rounded, 3 bullnose
+
+const float BEVEL_SIZE = 0.014;    // the bevel cuts 14 mm off the top front corner
+const float ROUNDED_RADIUS = 0.010; // a 10 mm rounded edge
+
+// The countertop slab with a shaped front edge.
+//
+// The edge is designed in 2D, as the cross-section you would see if you cut the slab
+// and looked at it from the side: z runs towards the front, y runs up. That 2D shape is
+// then extruded along x. All four profiles come from the same rounded-rectangle formula:
+//   square   - corner radius 0
+//   rounded  - a small corner radius
+//   bullnose - corner radius = half the thickness, so the front becomes a half circle
+//   bevelled - a square profile with the top front corner cut off by a 45 degree plane
+float sdSlab(vec3 p) {
+  float halfThickness = SLAB_THICKNESS / 2.0;
+  float halfWidth = CABINET_HALF_WIDTH + SLAB_OVERHANG;
+  float frontZ = WALL_Z + CABINET_DEPTH + SLAB_OVERHANG;
+
+  // Profile coordinates: y measured from the middle of the slab, z from its front face.
+  float y = p.y - (CABINET_HEIGHT + halfThickness);
+  float z = p.z - frontZ;
+
+  float radius = 0.0;
+  if (uEdge == 2) radius = ROUNDED_RADIUS;
+  if (uEdge == 3) radius = halfThickness;
+
+  // 2D rounded rectangle: shrink the rectangle by the radius, then grow it back by the
+  // radius in every direction, which rounds the corners.
+  vec2 q = vec2(z + radius, abs(y) - halfThickness + radius);
+  float profile = length(max(q, 0.0)) + min(max(q.x, q.y), 0.0) - radius;
+
+  if (uEdge == 1) {
+    // Intersection of two shapes is max(a, b). Keep only the part of the profile that is
+    // behind a 45 degree plane through the top front corner.
+    float bevelPlane = (y - halfThickness + z + BEVEL_SIZE) * 0.7071;
+    profile = max(profile, bevelPlane);
+  }
+
+  // Extrude along x: intersect with the slab's width and with the wall behind it.
+  return max(profile, max(abs(p.x) - halfWidth, WALL_Z - p.z));
+}
+
 // Keep whichever of the two (distance, material) pairs is closer.
 vec2 closer(vec2 a, vec2 b) {
   return a.x < b.x ? a : b;
@@ -29,15 +72,13 @@ vec2 map(vec3 p) {
   vec3 cabinetHalfSize = vec3(CABINET_HALF_WIDTH, CABINET_HEIGHT / 2.0, CABINET_DEPTH / 2.0);
   result = closer(result, vec2(sdBox(p - cabinetCentre, cabinetHalfSize), MATERIAL_CABINET));
 
-  // Countertop: a thin box on top of the cabinet, overhanging the front and the sides.
-  float slabDepth = CABINET_DEPTH + SLAB_OVERHANG;
-  vec3 slabCentre = vec3(0.0, CABINET_HEIGHT + SLAB_THICKNESS / 2.0, WALL_Z + slabDepth / 2.0);
-  vec3 slabHalfSize = vec3(CABINET_HALF_WIDTH + SLAB_OVERHANG, SLAB_THICKNESS / 2.0, slabDepth / 2.0);
-  float stone = sdBox(p - slabCentre, slabHalfSize);
+  // Countertop: a slab on top of the cabinet, overhanging the front and the sides,
+  // with the edge profile chosen by the user.
+  float stone = sdSlab(p);
 
   // Backsplash: a strip of the same stone on the wall behind the countertop.
   vec3 splashCentre = vec3(0.0, CABINET_HEIGHT + SLAB_THICKNESS + 0.28, WALL_Z + 0.01);
-  stone = min(stone, sdBox(p - splashCentre, vec3(slabHalfSize.x, 0.28, 0.01)));
+  stone = min(stone, sdBox(p - splashCentre, vec3(CABINET_HALF_WIDTH + SLAB_OVERHANG, 0.28, 0.01)));
   result = closer(result, vec2(stone, MATERIAL_STONE));
 
   // Vase: two spheres blended with a smooth minimum. It gives a sense of scale now,

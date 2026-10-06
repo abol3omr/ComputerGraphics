@@ -21,4 +21,5 @@ npm run build    # type-check and production build
 
 ## Open source used
 
-[Vite](https://vite.dev) and [TypeScript](https://www.typescriptlang.org).
+[Vite](https://vite.dev), [TypeScript](https://www.typescriptlang.org) and
+[lil-gui](https://lil-gui.georgealways.com) (the control panel).

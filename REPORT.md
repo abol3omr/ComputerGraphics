@@ -61,3 +61,35 @@ The whole room is about 30 lines of distance functions and contains no triangles
 body and neck join smoothly.
 
 ![The room: floor, wall, cabinet, countertop, backsplash and vase with plain colors](./assets/part2_room.png)
+
+## Part 3: Edge Profiles
+
+### Approach
+
+- This is the first feature the customer actually uses: choosing between a **square**, **bevelled**,
+  **rounded** and **bullnose** edge.
+- I design the edge in 2D, as the cross-section of the slab seen from the side, and then extrude that
+  shape along the length of the countertop. The countertop is no longer `sdBox` but its own function,
+  `sdSlab`.
+- All the profiles come from one formula, the 2D rounded rectangle, by changing a single number, the
+  corner radius: 0 gives the square edge, 10 mm gives the rounded edge, and half the slab thickness
+  turns the front into a half circle, which is the bullnose.
+- The bevelled edge uses the **intersection** of two shapes, which for distance functions is
+  `max(a, b)`: the square profile intersected with a 45 degree plane that cuts 14 mm off the top front
+  corner.
+- The extrusion is also an intersection: the 2D profile (which is infinitely long in x) is cut to the
+  slab's width and at the wall with `max`.
+- The choice is sent to the shader as a uniform, `uEdge`, from a small control panel
+  ([lil-gui](https://lil-gui.georgealways.com), open source). I also added a second camera position,
+  a close-up of the front corner, where the profile is visible in cross-section.
+
+### Result
+
+Switching the edge changes one number in a formula, and the picture updates immediately. On a triangle
+mesh, each of these would be a separately modelled object, and the round ones would need many small
+polygons to look smooth.
+
+![The four edge profiles seen from the front corner: square, bevelled, rounded, bullnose](./assets/part3_edges.png)
+
+**Limitation:** only the front edge is profiled. The two side ends of the slab stay square, and the
+round profiles are rounded on the bottom as well as the top.
