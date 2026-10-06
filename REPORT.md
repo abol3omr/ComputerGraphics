@@ -33,3 +33,31 @@ The sphere is smooth at any zoom level because it is evaluated per pixel, not ap
 The colors confirm the normals: right is red (+x), up is green (+y), and facing the camera is blue (+z).
 
 ![A ray-marched sphere with its normals shown as colors](./assets/part1_sphere.png)
+
+## Part 2: Building the Room from Distance Functions
+
+### Approach
+
+- I added a second primitive, the box (`sdBox`), next to the sphere. Planes are even simpler: the floor
+  is `p.y` and the wall is `p.z - WALL_Z`.
+- The scene function `map(p)` now combines several shapes. The **union** of two shapes is the minimum
+  of their distances, so the room is built by taking the closest of: floor, wall, cabinet, countertop
+  slab, backsplash and a vase. All sizes are in metres (the cabinet is 0.86 m high, the slab 4 cm thick
+  with a 3 cm overhang), so the proportions are those of a real kitchen unit.
+- `map` returns two values: the distance and a **material id** of the closest shape. The ray marcher
+  passes the id on, and the shader picks a color from it. This replaces the per-face material of a mesh.
+- The vase is two spheres joined with a **smooth minimum** instead of `min`. It blends the two surfaces
+  over a small distance, so they melt into one shape with no crease. With a mesh this would need
+  remodelling; here it is one line.
+- The camera is no longer fixed on the z axis. `cameraRay` builds a forward / right / up frame from an
+  eye position and a target, the same idea as the view matrix in the homework, but used to aim rays
+  instead of transforming vertices.
+- The shading is still temporary: one fixed light direction plus a constant ambient term, only so the
+  shapes can be told apart. There are no shadows yet, which is why the scene looks flat.
+
+### Result
+
+The whole room is about 30 lines of distance functions and contains no triangles. Note the vase: its
+body and neck join smoothly.
+
+![The room: floor, wall, cabinet, countertop, backsplash and vase with plain colors](./assets/part2_room.png)

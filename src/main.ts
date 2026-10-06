@@ -1,6 +1,11 @@
 import { createProgram, resizeToDisplay } from "./gl";
 import vertexSource from "./shaders/fullscreen.vert.glsl?raw";
-import fragmentSource from "./shaders/raymarch.frag.glsl?raw";
+import sdf from "./shaders/sdf.glsl?raw";
+import scene from "./shaders/scene.glsl?raw";
+import raymarch from "./shaders/raymarch.frag.glsl?raw";
+
+// The fragment shader is assembled from three files: shapes, the scene, and the ray marcher.
+const fragmentSource = sdf + scene + raymarch;
 
 const canvas = document.querySelector<HTMLCanvasElement>("#view")!;
 const gl = canvas.getContext("webgl2");
