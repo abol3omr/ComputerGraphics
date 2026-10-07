@@ -71,6 +71,7 @@ To keep the repository clean and the reports professional, follow these standard
 | **HW3: Virtual Cameras and Projections** | [View Report](./assignments/hw3.md) |
 | **HW4: Triangle Rasterization and Depth Buffering** | [View Report](./assignments/hw4.md) |
 | **HW5: Lighting, Materials, and Shading** | [View Report](./assignments/hw5.md) |
+| **Project: Stone Previewer** | [View Report](./stone-previewer/REPORT.md) |
 
 ---
 *Note: Please ensure all internal links remain functional as you add new folders.*
