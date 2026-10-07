@@ -5,11 +5,12 @@
 uniform float uShadows;          // 1 = on, 0 = off
 uniform float uAmbientOcclusion; // 1 = on, 0 = off
 
-// One parallel (directional) light source, like the sun through a window.
-const vec3 LIGHT_DIRECTION = vec3(-0.60, 0.62, 0.55); // direction TO the light
-const vec3 La = vec3(0.20, 0.22, 0.26); // ambient light intensity
-const vec3 Ld = vec3(0.85, 0.81, 0.76); // diffuse light intensity
-const vec3 Ls = vec3(0.85, 0.81, 0.76); // specular light intensity
+// One parallel (directional) light source, the sun. Its direction and color depend on
+// the time of day and are computed in sun.ts.
+uniform vec3 uLightDirection; // direction TO the light
+uniform vec3 La; // ambient light intensity
+uniform vec3 Ld; // diffuse light intensity
+uniform vec3 Ls; // specular light intensity
 
 // Soft shadow: march from the surface point towards the light.
 // If the ray hits something, the point is in full shadow (0). If it only passes close
@@ -57,7 +58,7 @@ float ambientOcclusion(vec3 p, vec3 n) {
 // The shadow multiplies the diffuse and specular terms (light that comes straight from
 // the source). The ambient occlusion multiplies the ambient term (light from everywhere).
 vec3 phongReflection(vec3 p, vec3 n, vec3 v, Material m) {
-  vec3 l = normalize(LIGHT_DIRECTION);
+  vec3 l = normalize(uLightDirection);
   vec3 r = 2.0 * n * dot(n, l) - l;
 
   float shadow = mix(1.0, softShadow(p + n * 0.002, l), uShadows);

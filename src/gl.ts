@@ -27,9 +27,14 @@ export function createProgram(
   return program;
 }
 
-/** Make the drawing buffer match the size of the canvas on screen. */
-export function resizeToDisplay(canvas: HTMLCanvasElement): void {
-  const dpr = Math.min(window.devicePixelRatio || 1, 2);
+/**
+ * Make the drawing buffer match the size of the canvas on screen.
+ * `scale` below 1 renders fewer pixels (the browser stretches the result), which keeps
+ * the picture responsive while the camera is moving: the cost of ray marching is
+ * proportional to the number of pixels.
+ */
+export function resizeToDisplay(canvas: HTMLCanvasElement, scale = 1): void {
+  const dpr = Math.min(window.devicePixelRatio || 1, 2) * scale;
   const width = Math.max(1, Math.round(canvas.clientWidth * dpr));
   const height = Math.max(1, Math.round(canvas.clientHeight * dpr));
   if (canvas.width !== width || canvas.height !== height) {

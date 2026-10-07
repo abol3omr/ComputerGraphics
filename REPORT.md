@@ -267,3 +267,47 @@ off: the highlight alone does not make it look polished.
 
 **Limitation:** there is only one bounce, and the reflection is always perfectly sharp. A real satin
 finish gives a blurred reflection, which would need many rays per pixel.
+
+## Part 9: Orbit Camera and Time of Day
+
+### Approach
+
+- **Orbit camera.** The two fixed views are replaced by a camera the customer can move: drag to
+  rotate around the countertop and scroll to zoom. The camera is described by spherical coordinates
+  around a target point (azimuth, elevation and distance), and `eye()` converts them to a position.
+  The shader receives only the resulting eye and target as uniforms and builds its rays as before.
+  The two old views remain as buttons that jump to a starting position.
+- The angles are clamped so the eye always stays in front of the wall and above the floor. This is
+  necessary here, not only cosmetic: the wall and floor are infinite planes, and a ray that starts
+  behind one of them is "inside" the solid and cannot march.
+- **Half resolution while moving.** The cost of ray marching is proportional to the number of pixels,
+  because every pixel marches its own rays (camera, shadow and reflection). While the camera is being
+  dragged, the picture is rendered at half the resolution in each direction, a quarter of the pixels,
+  and redrawn at full resolution when the mouse is released. In a rasterizer the cost depends mostly
+  on the number of triangles, so this trade-off is specific to this technique.
+- **Time of day.** The light is one parallel source, the sun. A slider sets the hour between 6:00 and
+  18:00, and `sunAt(hour)` computes the light from it: the direction moves on a half circle from the
+  left of the countertop, over the top, to the right, and the color and intensity go from warm and
+  weak near the horizon to white and strong at noon. The ambient light changes with it. These values
+  are the `l`, `La`, `Ld` and `Ls` of the Phong model, now sent as uniforms.
+- **Animation.** "Play the day" animates the hour from sunrise to sunset in 12 seconds. It is the
+  simplest kind of keyframe animation from the lecture: two keys on a timeline (6:00 and 18:00) and
+  linear interpolation between them, evaluated every frame.
+
+### Result
+
+The same countertop from four camera positions:
+
+![The countertop seen from the left, from above, from the front and from the right](./assets/part9_orbit.png)
+
+Four times of day. The direction of the shadows, their length and the color of the light all change,
+which is what lets a customer judge a stone in morning or evening light:
+
+![The scene at 7:00, 9:30, 12:00 and 17:00](./assets/part9_time_of_day.png)
+
+The whole day, as played by the animation:
+
+![Animation of the light from 6:00 to 18:00](./assets/part9_day.gif)
+
+**Limitation:** the sun's path is a simple half circle chosen to look right. It does not depend on
+the season, the location or which way the room faces.
