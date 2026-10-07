@@ -403,20 +403,6 @@ shader of a few hundred lines, with no mesh and no image files.
 - More of the kitchen: a sink cut-out (a subtraction of two distance functions) and upper cabinets.
 - Blurred reflections for the satin finish.
 
-### Development process
-
-The course treats AI as a development partner, and this project was built that way, with Claude
-(Anthropic) as the assistant. The work was done in the nine parts above, one commit per part. For
-each part I ran the app, read the new code, and only then committed it. Several parts came from my
-own requests or from problems I found while testing:
-
-- The first project idea (a subdivided, textured mesh viewer) was dropped because it repeated the
-  homework engine.
-- I asked for the countertop size to be adjustable without stretching the marble (Part 4), and for
-  the floor, wall and cabinet options (Part 7).
-- I noticed that the backsplash did not follow the slab thickness, that the reflections did not
-  follow the wall color, and that the color picker was slow. Each was fixed in its own change.
-
 ### References
 
 - John C. Hart, "Sphere Tracing: A Geometric Method for the Antialiased Ray Tracing of Implicit
