@@ -26,6 +26,9 @@ const uDepth = uniform("uDepth");
 const uThickness = uniform("uThickness");
 const uStone = uniform("uStone");
 const uSlab = uniform("uSlab");
+const uFloor = uniform("uFloor");
+const uWallColor = uniform("uWallColor");
+const uCabinetColor = uniform("uCabinetColor");
 const uShadows = uniform("uShadows");
 const uAmbientOcclusion = uniform("uAmbientOcclusion");
 
@@ -33,6 +36,7 @@ const uAmbientOcclusion = uniform("uAmbientOcclusion");
 const EDGES = ["Square", "Bevelled", "Rounded", "Bullnose"] as const;
 const VIEWS = ["Overview", "Edge close-up"] as const;
 const STONES = ["White marble", "Black marble", "Green marble", "Travertine"] as const;
+const FLOORS = ["Wood planks", "Tiles", "Concrete"] as const;
 
 const settings = {
   stone: "White marble" as (typeof STONES)[number],
@@ -42,6 +46,9 @@ const settings = {
   length: 220, // cm, along the wall
   depth: 63, // cm, from the wall to the front edge
   thickness: 4, // cm
+  floor: "Wood planks" as (typeof FLOORS)[number],
+  wallColor: "#d3d0ca",
+  cabinetColor: "#5a6f7d",
   shadows: true,
   ambientOcclusion: true,
 };
@@ -59,8 +66,25 @@ for (const key of ["length", "depth", "thickness", "slab"] as const) {
   const value = Number(query.get(key));
   if (query.has(key) && Number.isFinite(value)) settings[key] = value;
 }
+const queryFloor = query.get("floor") as (typeof FLOORS)[number] | null;
+if (queryFloor && FLOORS.includes(queryFloor)) settings.floor = queryFloor;
+for (const key of ["wallColor", "cabinetColor"] as const) {
+  const value = query.get(key); // six hex digits, without the #
+  if (value && /^[0-9a-fA-F]{6}$/.test(value)) settings[key] = "#" + value;
+}
 for (const key of ["shadows", "ambientOcclusion"] as const) {
   if (query.has(key)) settings[key] = query.get(key) !== "0";
+}
+
+/**
+ * Convert a "#rrggbb" color from the color picker to linear RGB.
+ * The picker shows gamma-encoded (sRGB) colors, but the lighting is computed in linear
+ * light and gamma-corrected at the end, so the color has to be decoded first.
+ */
+function hexToLinear(hex: string): [number, number, number] {
+  const n = parseInt(hex.slice(1), 16);
+  const channel = (c: number) => Math.pow(c / 255, 2.2);
+  return [channel((n >> 16) & 255), channel((n >> 8) & 255), channel(n & 255)];
 }
 
 function draw(): void {
@@ -76,6 +100,9 @@ function draw(): void {
   gl!.uniform1f(uThickness, settings.thickness / 100);
   gl!.uniform1i(uStone, STONES.indexOf(settings.stone));
   gl!.uniform1f(uSlab, settings.slab);
+  gl!.uniform1i(uFloor, FLOORS.indexOf(settings.floor));
+  gl!.uniform3fv(uWallColor, hexToLinear(settings.wallColor));
+  gl!.uniform3fv(uCabinetColor, hexToLinear(settings.cabinetColor));
   gl!.uniform1f(uShadows, settings.shadows ? 1 : 0);
   gl!.uniform1f(uAmbientOcclusion, settings.ambientOcclusion ? 1 : 0);
   gl!.drawArrays(gl!.TRIANGLES, 0, 3); // the full-screen triangle
@@ -92,6 +119,11 @@ const size = gui.addFolder("Countertop size (cm)");
 size.add(settings, "length", 100, 320, 5).onChange(draw);
 size.add(settings, "depth", 50, 90, 1).onChange(draw);
 size.add(settings, "thickness", 2, 6, 0.5).onChange(draw);
+
+const room = gui.addFolder("Room");
+room.add(settings, "floor", [...FLOORS]).onChange(draw);
+room.addColor(settings, "wallColor").name("wall color").onChange(draw);
+room.addColor(settings, "cabinetColor").name("cabinet color").onChange(draw);
 
 const light = gui.addFolder("Lighting");
 light.add(settings, "shadows").name("soft shadows").onChange(draw);

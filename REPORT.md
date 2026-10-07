@@ -193,3 +193,38 @@ Two things follow from the texture being a function of the 3D point:
 
 **Limitation:** this is a generic stone *type*, not a photograph of a specific slab, and real veins
 are less regular than the ones this function produces.
+
+## Part 7: Room Options
+
+### Approach
+
+- A customer judges a stone against their own kitchen, so the room can now be changed: the floor
+  (wood planks, tiles or concrete), the wall color and the cabinet color.
+- **Repeating patterns without geometry.** Planks and tiles are not separate objects. The floor is
+  still the single plane `p.y = 0`. The pattern comes from the coordinates: `floor(p / size)` says
+  *which* plank or tile a point is in, and `fract(p / size)` says *where* inside it. A dark gap or
+  grout line is drawn where the point is close to the edge of its cell.
+- **A random number per cell.** Hashing the cell index (with the same hash function as the noise)
+  gives every plank and tile its own random number. I use it to stagger the rows of planks, to tint
+  each plank and tile slightly differently, and to choose where in the log each plank was cut.
+- **Wood grain** uses the wood function from the lecture, `x = (p.x^2 + p.y^2) + FBm(p)` and
+  `wood_color(sin(x))`. `p.x^2 + p.y^2` is the squared distance from the axis of the log, so `sin` of it
+  gives the growth rings, and `FBm` makes them irregular. Each plank evaluates it at a different
+  position inside the log, so no two planks have the same grain.
+- **Tiles** add a faint `FBm` variation inside each tile and are slightly shiny, but the grout is
+  not. **Concrete** is `FBm` for large soft patches plus high-frequency `Noise` for fine grain.
+- The **cabinet** color comes from a color picker, and thin gaps between doors are drawn on its front
+  face. The number of doors follows the countertop length (one door per 55 cm or so).
+- The color picker gives gamma-encoded colors, while the lighting is computed in linear light and
+  gamma-corrected at the end. So the picked color is decoded (`c^2.2`) before it is sent to the
+  shader; otherwise every picked color would look washed out.
+
+### Result
+
+Four combinations of stone, floor, wall and cabinet. Everything visible is still computed by one
+fragment shader, with no image files.
+
+![Four rooms: wood planks, tiles and concrete floors with different cabinet and wall colors](./assets/part7_room_options.png)
+
+**Limitation:** thin lines such as the plank gaps and tile grout flicker a little far from the camera,
+because each pixel is sampled only once (there is no anti-aliasing yet).

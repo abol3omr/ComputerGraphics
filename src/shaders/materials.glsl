@@ -54,10 +54,92 @@ vec3 marble(vec3 p) {
   return color * (0.94 + 0.06 * FBm(9.0 * p)); // faint cloudy variation in the base
 }
 
+// --- the room --------------------------------------------------------------------
+
+uniform int uFloor;         // 0 wood planks, 1 tiles, 2 concrete
+uniform vec3 uWallColor;
+uniform vec3 uCabinetColor;
+
+// A pseudo-random number in [0, 1] for a grid cell, from the same hash as the noise.
+float random(ivec2 cell) {
+  return float(hash(uint(cell.x) + hash(uint(cell.y))) & 0xffffU) / 65535.0;
+}
+
+// Distance from a point inside a rectangular cell to the nearest side of the cell.
+float distanceToCellEdge(vec2 local, vec2 size) {
+  return min(min(local.x, size.x - local.x), min(local.y, size.y - local.y));
+}
+
+// Wood planks. The floor is divided into planks by repeating the coordinates with
+// floor() and fract(). Each plank gets its own random number, used to stagger the rows,
+// tint the plank and choose where in the log it was cut from.
+//
+// The grain is the wood function from the lecture:
+//
+//   function wood(p)
+//     x = (p.x^2 + p.y^2) + FBm(p);
+//     return wood_color(sin(x))
+//
+// p.x^2 + p.y^2 is the squared distance from the axis of the log, so sin() of it gives
+// the growth rings, and FBm makes them irregular.
+Material woodPlanks(vec3 p) {
+  const vec2 PLANK = vec2(1.20, 0.14); // length and width of a plank, in metres
+  float row = floor(p.z / PLANK.y);
+  float stagger = random(ivec2(int(row), 7)) * PLANK.x;
+  float column = floor((p.x + stagger) / PLANK.x);
+  float r = random(ivec2(int(row), int(column)));
+  vec2 local = vec2(fract((p.x + stagger) / PLANK.x), fract(p.z / PLANK.y)) * PLANK;
+
+  // Position of this point inside the log: q.xy across the rings, q.z along the trunk.
+  vec3 q = vec3(local.y + 0.25 + 0.5 * r, 0.3 + r, 0.08 * p.x + 10.0 * r);
+  float x = 55.0 * (q.x * q.x + q.y * q.y) + 1.2 * FBm(vec3(6.0 * q.xy, 4.0 * q.z));
+  vec3 color = mix(vec3(0.22, 0.12, 0.06), vec3(0.45, 0.29, 0.16), 0.5 + 0.5 * sin(x)); // wood_color
+  color *= 0.80 + 0.40 * r;
+
+  // A dark gap between planks.
+  color *= mix(0.35, 1.0, smoothstep(0.0, 0.004, distanceToCellEdge(local, PLANK)));
+  return Material(color, 0.12, 25.0);
+}
+
+// Square tiles with grout lines. Each tile has a slightly different shade, and FBm
+// adds a faint cloudy variation inside it.
+Material tiles(vec3 p) {
+  const vec2 TILE = vec2(0.60, 0.60);
+  ivec2 cell = ivec2(floor(p.xz / TILE));
+  vec2 local = fract(p.xz / TILE) * TILE;
+  vec3 color = vec3(0.56, 0.54, 0.50) * (0.93 + 0.10 * random(cell)) * (0.96 + 0.06 * FBm(4.0 * p));
+  float grout = smoothstep(0.002, 0.006, distanceToCellEdge(local, TILE));
+  return Material(mix(vec3(0.20, 0.19, 0.18), color, grout), 0.35 * grout, 60.0);
+}
+
+// Poured concrete: large soft patches from FBm plus fine grain from high-frequency noise.
+Material concrete(vec3 p) {
+  vec3 color = vec3(0.33, 0.33, 0.32) * (0.90 + 0.14 * FBm(1.5 * p) + 0.05 * Noise(60.0 * p));
+  return Material(color, 0.05, 10.0);
+}
+
+// The cabinet: a painted box with thin dark gaps between the doors on its front face.
+Material cabinet(vec3 p) {
+  vec3 color = uCabinetColor;
+  float frontZ = WALL_Z + uDepth - SLAB_OVERHANG;
+  if (abs(p.z - frontZ) < 0.002) {
+    float cabinetLength = uLength - 2.0 * SLAB_OVERHANG;
+    float doorWidth = cabinetLength / max(1.0, floor(cabinetLength / 0.55 + 0.5)); // doors of about 55 cm
+    float x = p.x + cabinetLength / 2.0;
+    float distanceToGap = abs(fract(x / doorWidth + 0.5) - 0.5) * doorWidth;
+    color *= mix(0.35, 1.0, smoothstep(0.002, 0.007, distanceToGap));
+  }
+  return Material(color, 0.15, 30.0);
+}
+
 Material getMaterial(float id, vec3 p) {
-  if (id == MATERIAL_FLOOR) return Material(vec3(0.42, 0.29, 0.19), 0.10, 20.0);
-  if (id == MATERIAL_WALL) return Material(vec3(0.66, 0.64, 0.60), 0.00, 1.0);
-  if (id == MATERIAL_CABINET) return Material(vec3(0.10, 0.16, 0.21), 0.15, 30.0);
+  if (id == MATERIAL_FLOOR) {
+    if (uFloor == 1) return tiles(p);
+    if (uFloor == 2) return concrete(p);
+    return woodPlanks(p);
+  }
+  if (id == MATERIAL_WALL) return Material(uWallColor, 0.00, 1.0);
+  if (id == MATERIAL_CABINET) return cabinet(p);
   if (id == MATERIAL_STONE) return Material(marble(p), 0.60, 90.0);
   return Material(vec3(0.55, 0.22, 0.13), 0.35, 50.0); // vase
 }
