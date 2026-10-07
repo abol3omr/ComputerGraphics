@@ -228,3 +228,42 @@ fragment shader, with no image files.
 
 **Limitation:** thin lines such as the plank gaps and tile grout flicker a little far from the camera,
 because each pixel is sampled only once (there is no anti-aliasing yet).
+
+## Part 8: Polished and Matte Finishes
+
+### Approach
+
+- The second decision the customer makes is the **finish**: polished, satin or matte. The finish does
+  not change the color of the stone, only how it reflects light, so it is a single number, `uPolish`,
+  between 0 and 1.
+- It changes three properties of the stone's material: the specular coefficient `ks` (how strong the
+  highlight is), the shininess exponent `alpha` (how small and sharp it is), and a new property,
+  `reflectivity` (how mirror-like the surface is).
+- **Mirror reflection.** When the camera ray hits a reflective surface, I send a second ray in the
+  mirror direction, `reflect(rayDirection, n)`, find what it hits, light that point with the same
+  Phong function, and blend the result into the color. This is one bounce of ray tracing. To reuse the
+  code, marching, normal, material and lighting are wrapped in one function, `trace`, which is called
+  once for the camera ray and once for the reflected ray.
+- **Fresnel effect.** A real polished surface reflects more when seen at a grazing angle than when
+  seen straight on. I use Schlick's approximation: `F = R0 + (Rmax - R0) * (1 - cos(theta))^5`, where
+  `R0` is the material's reflectivity and `theta` is the angle between the view direction and the
+  normal.
+- The Phong model from the lecture is a *local* illumination model: each point only knows about the
+  light, not about other objects. Shadows (Part 5) and this reflection are the two places where the
+  project goes beyond it and lets objects affect each other.
+- Only the wall behind the countertop is modelled. Rays that leave the scene return the chosen wall
+  color (lighter towards the ceiling), which stands in for the other walls and the ceiling. This way
+  the reflections in the stone follow the wall color picker. A checkbox switches the reflections off
+  for comparison.
+
+### Result
+
+The same black marble with the three finishes. On the polished top the vase and the backsplash are
+mirrored, and the highlight is small and sharp. On the matte top there is no mirror image and the
+light spreads evenly. The last picture is the polished material with the reflection ray switched
+off: the highlight alone does not make it look polished.
+
+![Polished, satin and matte finishes, and polished with reflections switched off](./assets/part8_finishes.png)
+
+**Limitation:** there is only one bounce, and the reflection is always perfectly sharp. A real satin
+finish gives a blurred reflection, which would need many rays per pixel.

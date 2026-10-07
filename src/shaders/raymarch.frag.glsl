@@ -7,6 +7,7 @@
 
 uniform vec2 uResolution;
 uniform int uView; // 0 overview, 1 close-up of the countertop edge
+uniform float uReflections; // 1 = on, 0 = off
 
 out vec4 fragColor;
 
@@ -48,6 +49,29 @@ vec3 cameraRay(vec2 uv, vec3 eye, vec3 target, float focalLength) {
   return normalize(uv.x * right + uv.y * up + focalLength * forward);
 }
 
+// What a ray sees when it hits nothing. Only the wall behind the countertop is modelled,
+// so this stands in for the other walls and the ceiling, which matter mainly in
+// reflections. They take the chosen wall color, lit roughly like the real wall, and the
+// ceiling is a lighter version of it.
+vec3 environment(vec3 direction) {
+  vec3 light = La + 0.55 * Ld;
+  vec3 walls = uWallColor * light;
+  vec3 ceiling = mix(uWallColor, vec3(0.85), 0.6) * light;
+  return mix(walls, ceiling, smoothstep(0.3, 0.8, direction.y));
+}
+
+// Follow one ray into the scene and return the color it sees.
+// If it hits a surface, `p`, `n` and `material` describe the hit point; otherwise hit = false.
+vec3 trace(vec3 rayOrigin, vec3 rayDirection, out bool hit, out vec3 p, out vec3 n, out Material material) {
+  vec2 result = march(rayOrigin, rayDirection);
+  hit = result.x > 0.0;
+  if (!hit) return environment(rayDirection);
+  p = rayOrigin + rayDirection * result.x;
+  n = calcNormal(p);
+  material = getMaterial(result.y, p);
+  return phongReflection(p, n, -rayDirection, material); // v = direction back to the eye
+}
+
 void main() {
   // Pixel -> point on the image plane, with (0,0) in the centre and y in [-1, 1].
   vec2 uv = (2.0 * gl_FragCoord.xy - uResolution) / uResolution.y;
@@ -66,14 +90,29 @@ void main() {
   }
   vec3 rayDirection = cameraRay(uv, eye, target, focalLength);
 
-  vec3 color = vec3(0.35, 0.45, 0.60); // sky, only visible if a ray hits nothing
+  bool hit;
+  vec3 p, n;
+  Material material;
+  vec3 color = trace(eye, rayDirection, hit, p, n, material);
 
-  vec2 hit = march(eye, rayDirection);
-  if (hit.x > 0.0) {
-    vec3 p = eye + rayDirection * hit.x;
-    vec3 n = calcNormal(p);
-    vec3 v = -rayDirection; // direction from the surface point to the eye
-    color = phongReflection(p, n, v, getMaterial(hit.y, p));
+  // Mirror reflection: if the surface is reflective, send a second ray in the mirror
+  // direction and blend in what it sees. This is one bounce of ray tracing.
+  if (hit && material.reflectivity > 0.0 && uReflections > 0.5) {
+    vec3 mirrorDirection = reflect(rayDirection, n);
+
+    // Fresnel effect (Schlick's approximation): a surface reflects more at a grazing
+    // angle than when you look straight at it. cosTheta is 1 looking straight on.
+    float cosTheta = max(dot(n, -rayDirection), 0.0);
+    // A less polished surface also reflects less at grazing angles, so the upper limit
+    // is tied to the reflectivity instead of being 1.
+    float grazing = min(1.0, 8.0 * material.reflectivity);
+    float fresnel = material.reflectivity + (grazing - material.reflectivity) * pow(1.0 - cosTheta, 5.0);
+
+    bool hit2;
+    vec3 p2, n2;
+    Material material2;
+    vec3 reflected = trace(p + n * 0.002, mirrorDirection, hit2, p2, n2, material2);
+    color = mix(color, reflected, fresnel);
   }
 
   // "Beware of overflows": clamp, then gamma-correct, because the lighting is computed

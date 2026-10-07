@@ -26,6 +26,8 @@ const uDepth = uniform("uDepth");
 const uThickness = uniform("uThickness");
 const uStone = uniform("uStone");
 const uSlab = uniform("uSlab");
+const uPolish = uniform("uPolish");
+const uReflections = uniform("uReflections");
 const uFloor = uniform("uFloor");
 const uWallColor = uniform("uWallColor");
 const uCabinetColor = uniform("uCabinetColor");
@@ -37,10 +39,14 @@ const EDGES = ["Square", "Bevelled", "Rounded", "Bullnose"] as const;
 const VIEWS = ["Overview", "Edge close-up"] as const;
 const STONES = ["White marble", "Black marble", "Green marble", "Travertine"] as const;
 const FLOORS = ["Wood planks", "Tiles", "Concrete"] as const;
+// The finish and how polished it is: 1 = mirror-like, 0 = fully matte.
+const FINISHES = { Polished: 1.0, Satin: 0.45, Matte: 0.0 } as const;
+type Finish = keyof typeof FINISHES;
 
 const settings = {
   stone: "White marble" as (typeof STONES)[number],
   slab: 0, // which part of the stone the slab is cut from
+  finish: "Polished" as Finish,
   edge: "Rounded" as (typeof EDGES)[number],
   view: "Overview" as (typeof VIEWS)[number],
   length: 220, // cm, along the wall
@@ -51,6 +57,7 @@ const settings = {
   cabinetColor: "#5a6f7d",
   shadows: true,
   ambientOcclusion: true,
+  reflections: true,
 };
 
 // Settings can also be given in the address bar, e.g. ?edge=Bullnose&length=300&thickness=2
@@ -66,13 +73,15 @@ for (const key of ["length", "depth", "thickness", "slab"] as const) {
   const value = Number(query.get(key));
   if (query.has(key) && Number.isFinite(value)) settings[key] = value;
 }
+const queryFinish = query.get("finish") as Finish | null;
+if (queryFinish && queryFinish in FINISHES) settings.finish = queryFinish;
 const queryFloor = query.get("floor") as (typeof FLOORS)[number] | null;
 if (queryFloor && FLOORS.includes(queryFloor)) settings.floor = queryFloor;
 for (const key of ["wallColor", "cabinetColor"] as const) {
   const value = query.get(key); // six hex digits, without the #
   if (value && /^[0-9a-fA-F]{6}$/.test(value)) settings[key] = "#" + value;
 }
-for (const key of ["shadows", "ambientOcclusion"] as const) {
+for (const key of ["shadows", "ambientOcclusion", "reflections"] as const) {
   if (query.has(key)) settings[key] = query.get(key) !== "0";
 }
 
@@ -100,6 +109,8 @@ function draw(): void {
   gl!.uniform1f(uThickness, settings.thickness / 100);
   gl!.uniform1i(uStone, STONES.indexOf(settings.stone));
   gl!.uniform1f(uSlab, settings.slab);
+  gl!.uniform1f(uPolish, FINISHES[settings.finish]);
+  gl!.uniform1f(uReflections, settings.reflections ? 1 : 0);
   gl!.uniform1i(uFloor, FLOORS.indexOf(settings.floor));
   gl!.uniform3fv(uWallColor, hexToLinear(settings.wallColor));
   gl!.uniform3fv(uCabinetColor, hexToLinear(settings.cabinetColor));
@@ -112,6 +123,7 @@ function draw(): void {
 const gui = new GUI({ title: "Stone Previewer" });
 gui.add(settings, "stone", [...STONES]).onChange(draw);
 gui.add(settings, "slab", 0, 20, 1).name("slab number").onChange(draw);
+gui.add(settings, "finish", Object.keys(FINISHES)).onChange(draw);
 gui.add(settings, "edge", [...EDGES]).name("edge profile").onChange(draw);
 gui.add(settings, "view", [...VIEWS]).onChange(draw);
 
@@ -128,6 +140,7 @@ room.addColor(settings, "cabinetColor").name("cabinet color").onChange(draw);
 const light = gui.addFolder("Lighting");
 light.add(settings, "shadows").name("soft shadows").onChange(draw);
 light.add(settings, "ambientOcclusion").name("ambient occlusion").onChange(draw);
+light.add(settings, "reflections").onChange(draw);
 if (query.get("ui") === "0") gui.hide();
 
 window.addEventListener("resize", draw);

@@ -5,12 +5,14 @@ struct Material {
   vec3 k;      // material color, used as both the ambient (ka) and diffuse (kd) color
   float ks;    // specular reflection coefficient
   float alpha; // shininess exponent: higher = smaller, sharper highlight
+  float reflectivity; // how mirror-like the surface is, looking straight at it (0 = not at all)
 };
 
 // --- stone ---------------------------------------------------------------------
 
 uniform int uStone;  // 0 white marble, 1 black marble, 2 green marble, 3 travertine
 uniform float uSlab; // which part of the "quarry" the slab is cut from
+uniform float uPolish; // the finish: 0 = matte, 1 = polished
 
 struct Stone {
   vec3 vein;        // color of the veins
@@ -98,7 +100,7 @@ Material woodPlanks(vec3 p) {
 
   // A dark gap between planks.
   color *= mix(0.35, 1.0, smoothstep(0.0, 0.004, distanceToCellEdge(local, PLANK)));
-  return Material(color, 0.12, 25.0);
+  return Material(color, 0.12, 25.0, 0.0);
 }
 
 // Square tiles with grout lines. Each tile has a slightly different shade, and FBm
@@ -109,13 +111,13 @@ Material tiles(vec3 p) {
   vec2 local = fract(p.xz / TILE) * TILE;
   vec3 color = vec3(0.56, 0.54, 0.50) * (0.93 + 0.10 * random(cell)) * (0.96 + 0.06 * FBm(4.0 * p));
   float grout = smoothstep(0.002, 0.006, distanceToCellEdge(local, TILE));
-  return Material(mix(vec3(0.20, 0.19, 0.18), color, grout), 0.35 * grout, 60.0);
+  return Material(mix(vec3(0.20, 0.19, 0.18), color, grout), 0.35 * grout, 60.0, 0.03 * grout);
 }
 
 // Poured concrete: large soft patches from FBm plus fine grain from high-frequency noise.
 Material concrete(vec3 p) {
   vec3 color = vec3(0.33, 0.33, 0.32) * (0.90 + 0.14 * FBm(1.5 * p) + 0.05 * Noise(60.0 * p));
-  return Material(color, 0.05, 10.0);
+  return Material(color, 0.05, 10.0, 0.0);
 }
 
 // The cabinet: a painted box with thin dark gaps between the doors on its front face.
@@ -129,7 +131,7 @@ Material cabinet(vec3 p) {
     float distanceToGap = abs(fract(x / doorWidth + 0.5) - 0.5) * doorWidth;
     color *= mix(0.35, 1.0, smoothstep(0.002, 0.007, distanceToGap));
   }
-  return Material(color, 0.15, 30.0);
+  return Material(color, 0.15, 30.0, 0.0);
 }
 
 Material getMaterial(float id, vec3 p) {
@@ -138,8 +140,18 @@ Material getMaterial(float id, vec3 p) {
     if (uFloor == 2) return concrete(p);
     return woodPlanks(p);
   }
-  if (id == MATERIAL_WALL) return Material(uWallColor, 0.00, 1.0);
+  if (id == MATERIAL_WALL) return Material(uWallColor, 0.00, 1.0, 0.0);
   if (id == MATERIAL_CABINET) return cabinet(p);
-  if (id == MATERIAL_STONE) return Material(marble(p), 0.60, 90.0);
-  return Material(vec3(0.55, 0.22, 0.13), 0.35, 50.0); // vase
+  if (id == MATERIAL_STONE) {
+    // The finish changes how the stone reflects light, not its color:
+    //   polished - strong, sharp highlight and a visible mirror reflection
+    //   matte    - weak, wide highlight and no mirror reflection
+    return Material(
+      marble(p),
+      mix(0.06, 0.90, uPolish),   // ks
+      mix(10.0, 140.0, uPolish),  // alpha
+      mix(0.00, 0.10, uPolish)    // reflectivity
+    );
+  }
+  return Material(vec3(0.55, 0.22, 0.13), 0.35, 50.0, 0.0); // vase
 }
