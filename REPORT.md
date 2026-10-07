@@ -1,13 +1,62 @@
 # Stone Previewer - Project Report
 
-**Idea.** Customers choosing a stone countertop have to decide on an edge profile and a finish, and it
-is hard to imagine either from a small sample. This app shows the countertop in a room and lets the
-customer switch the stone, the edge and the finish, and move the light from morning to evening.
+**Computer Graphics, University of Haifa, 2026 - course project**
 
-**Technique.** The homework engine is a rasterizer: it loads a triangle mesh, projects it, fills the
-triangles and lights them locally. This project uses the opposite approach. There is no mesh. The scene
-is a mathematical function, and each pixel shoots a ray into it (ray marching). That makes rounded
-edges, soft shadows and reflections cheap, which are exactly the things this app needs to show.
+![The app: a polished black marble countertop with the control panel](./assets/hero.png)
+
+## Introduction
+
+**The problem.** A customer who buys a stone countertop has to make two decisions that are hard to
+picture from a small sample: the **edge profile** (square, bevelled, rounded or bullnose) and the
+**finish** (polished or matte). Both change how the same stone looks once it is installed, and both
+depend on the light in the room.
+
+**The app.** Stone Previewer shows a countertop in a simple room. The customer chooses the stone, the
+edge, the finish and the size, sets the floor, wall and cabinet to something close to their own
+kitchen, moves around it freely, and moves the light from morning to evening.
+
+**The technique.** The homework engine is a rasterizer: it loads a triangle mesh, projects it, fills
+the triangles and lights them locally. This project takes the opposite approach. There is no mesh.
+The scene is a mathematical function, and each pixel shoots a ray into it (**ray marching a signed
+distance function**). That makes rounded edges, soft shadows and reflections cheap, and those are
+exactly the things this app needs to show.
+
+### How it differs from the homework engine
+
+| | Homework engine (`nanorender`) | This project |
+| --- | --- | --- |
+| Scene | Triangle mesh loaded from an OBJ file | One function, `map(p)`: the distance to the nearest surface |
+| Rendering | Rasterization: project and fill triangles | Ray marching: one ray per pixel, stepped by the distance |
+| Visibility | Z-buffer | The first surface the ray reaches |
+| Normals | Cross product of triangle edges, averaged per vertex | Gradient of the distance function |
+| Shading | Flat, then Phong shading with interpolated normals | Phong reflection model, per pixel by construction |
+| Shadows | None | Soft shadows from a second ray towards the light |
+| Reflections | None | One-bounce mirror reflection with a Fresnel term |
+| Surface detail | One material color per model | Procedural 3D textures: marble, wood, tiles, concrete |
+| Changing a shape | Edit the mesh | Change a number in a formula |
+| Runs on | CPU, in C++ | GPU, in a fragment shader (WebGL2, TypeScript) |
+
+### Lecture topics used
+
+| Lecture | Where it appears |
+| --- | --- |
+| Illumination Models & Shading | Phong reflection model `I = Ia + Id + Is` with the lecture's notation (Part 5); finishes as `ks` and `alpha` (Part 8) |
+| Procedural Textures | `Noise`, `FBm`, `turbulence`, `marble`, `wood` with the names from the slides (Parts 6 and 7) |
+| Animation | Keyframe interpolation of the time of day (Part 9) |
+| Transformations and cameras | The camera frame (forward / right / up) used to aim rays (Parts 2 and 9) |
+
+### Contents
+
+1. [Ray Marching a Sphere](#part-1-ray-marching-a-sphere)
+2. [Building the Room from Distance Functions](#part-2-building-the-room-from-distance-functions)
+3. [Edge Profiles](#part-3-edge-profiles)
+4. [Adjustable Countertop Size](#part-4-adjustable-countertop-size)
+5. [Lighting, Soft Shadows and Ambient Occlusion](#part-5-lighting-soft-shadows-and-ambient-occlusion)
+6. [Procedural Stone](#part-6-procedural-stone)
+7. [Room Options](#part-7-room-options)
+8. [Polished and Matte Finishes](#part-8-polished-and-matte-finishes)
+9. [Orbit Camera and Time of Day](#part-9-orbit-camera-and-time-of-day)
+10. [Conclusion](#conclusion)
 
 ## Part 1: Ray Marching a Sphere
 
@@ -311,3 +360,77 @@ The whole day, as played by the animation:
 
 **Limitation:** the sun's path is a simple half circle chosen to look right. It does not depend on
 the season, the location or which way the room faces.
+
+## Conclusion
+
+### What works
+
+The app answers the question it set out to answer. A customer can compare four edge profiles and
+three finishes on four stones, at their own countertop size, against their own floor, wall and cabinet
+colors, from any angle and at any time of day. Everything on screen is computed by one fragment
+shader of a few hundred lines, with no mesh and no image files.
+
+### What I learned
+
+- A scene can be a function instead of a list of triangles, and the choice changes what is easy.
+  Rounding an edge, blending two shapes, casting a soft shadow or reflecting the room took a few lines
+  each here, and would each be a large feature in the homework rasterizer.
+- The opposite is also true. Things that are easy with a mesh are hard here: there is no simple way
+  to load an arbitrary model, and the cost grows with the number of pixels and the complexity of the
+  distance function, not with the number of triangles.
+- The Phong reflection model from the lecture carried over unchanged. Only the way its inputs are
+  found is different: the normal comes from a gradient, and visibility of the light from a second ray.
+- Procedural textures defined on the 3D point remove the whole problem of texture coordinates, which
+  is why the stone does not stretch when the countertop is resized.
+
+### Limitations
+
+- The stone is a generic type, not a photograph of a specific slab, and its veins are more regular
+  than real ones.
+- Only the front edge of the slab is profiled; the two ends stay square.
+- Reflections have one bounce and are always sharp, so the satin finish is only a weaker mirror.
+- Only the wall behind the countertop is modelled. The other walls and the ceiling exist only as a
+  color in reflections, and the camera is limited so it never looks at them.
+- There is no anti-aliasing: thin lines such as tile grout flicker in the distance.
+- The sun's path is a simple half circle and does not depend on season or location.
+- Performance depends on the graphics card, because every pixel marches several rays. The app lowers
+  the resolution while something is moving to stay responsive.
+
+### Possible next steps
+
+- Use a photograph of a real slab as the stone texture, projected onto the countertop.
+- Anti-aliasing by sending several rays per pixel when the picture is at rest.
+- More of the kitchen: a sink cut-out (a subtraction of two distance functions) and upper cabinets.
+- Blurred reflections for the satin finish.
+
+### Development process
+
+The course treats AI as a development partner, and this project was built that way, with Claude
+(Anthropic) as the assistant. The work was done in the nine parts above, one commit per part. For
+each part I ran the app, read the new code, and only then committed it. Several parts came from my
+own requests or from problems I found while testing:
+
+- The first project idea (a subdivided, textured mesh viewer) was dropped because it repeated the
+  homework engine.
+- I asked for the countertop size to be adjustable without stretching the marble (Part 4), and for
+  the floor, wall and cabinet options (Part 7).
+- I noticed that the backsplash did not follow the slab thickness, that the reflections did not
+  follow the wall color, and that the color picker was slow. Each was fixed in its own change.
+
+### References
+
+- John C. Hart, "Sphere Tracing: A Geometric Method for the Antialiased Ray Tracing of Implicit
+  Surfaces", The Visual Computer, 1996 (the ray marching method).
+- Inigo Quilez, articles on [distance functions](https://iquilezles.org/articles/distfunctions/),
+  [smooth minimum](https://iquilezles.org/articles/smin/) and
+  [soft shadows](https://iquilezles.org/articles/rmshadows/).
+- Ken Perlin, "An Image Synthesizer", SIGGRAPH 1985 (noise, turbulence and marble).
+- Christophe Schlick, "An Inexpensive BRDF Model for Physically-based Rendering", 1994 (the Fresnel
+  approximation).
+- Course lectures: Illumination Models & Shading, Procedural Textures, Animation.
+
+### Open source used
+
+[Vite](https://vite.dev), [TypeScript](https://www.typescriptlang.org) and
+[lil-gui](https://lil-gui.georgealways.com) (the control panel). The rendering, distance functions,
+noise and lighting code were written for this project.
